@@ -158,9 +158,9 @@ Runtime state files (gitignored): `papers_cache.json`, `feedback.json`, `mylist.
 
 | Source | Auth required | Status |
 |--------|--------------|--------|
-| arXiv | None | ✅ Production |
-| Semantic Scholar | None | ✅ Production (rate-limited) |
-| HuggingFace Daily Papers | None | ✅ Production |
+| arXiv | None | ✅ Completed |
+| Semantic Scholar | None | ✅ Completed (rate-limited) |
+| HuggingFace Daily Papers | None | ✅ Completed |
 | Twitter/X | Bearer token | 🚧 WIP — extracts arXiv links from tweets, not yet stable |
 
 > **Twitter/X note:** The Twitter source is functional but considered WIP. The free API tier has tight rate limits and the signal-to-noise ratio depends heavily on who you follow. Contributions to improve this source are welcome.
