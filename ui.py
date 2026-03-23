@@ -372,6 +372,10 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
 .btn-rm { position: absolute; top: 12px; right: 12px; background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 0.77rem; padding: 3px 8px; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
 .btn-rm:hover { background: rgba(247,106,106,0.1); color: var(--danger); border-color: rgba(247,106,106,0.3); }
 
+/* explore button */
+.btn-explore { background: rgba(251,191,36,0.1); color: #fbbf24; border-color: rgba(251,191,36,0.3); }
+.btn-explore:hover:not(:disabled) { background: rgba(251,191,36,0.2); }
+
 /* summarize button */
 .btn-summarize { background: rgba(34,197,94,0.1); color: #22c55e; border-color: rgba(34,197,94,0.3); }
 .btn-summarize:hover:not(:disabled) { background: rgba(34,197,94,0.2); }
@@ -439,6 +443,87 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
   .action-bar { padding: 10px 14px; }
   .tab-btn { padding: 0 10px; font-size: 0.8rem; }
 }
+
+/* Explorations tab */
+.explorations-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr 260px;
+  height: calc(100vh - 52px);
+  overflow: hidden;
+}
+.exp-left {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px 0;
+  background: var(--card);
+}
+.exp-middle {
+  overflow-y: auto;
+  padding: 24px 28px;
+}
+.exp-right {
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--card);
+  padding: 0;
+}
+.exp-right-header {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  z-index: 1;
+}
+.exp-paper-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.exp-paper-item:hover { background: rgba(124,106,247,0.06); }
+.exp-paper-item.active {
+  border-left-color: var(--accent);
+  background: rgba(124,106,247,0.1);
+}
+.exp-paper-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.exp-paper-meta { font-size: 0.74rem; color: var(--muted); line-height: 1.4; }
+.exp-paper-status {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 1px 7px;
+  border-radius: var(--chip-radius);
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: rgba(124,106,247,0.12);
+  color: var(--accent);
+  border: 1px solid rgba(124,106,247,0.25);
+}
+.exp-related-item {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.exp-related-item:hover { background: rgba(255,255,255,0.03); }
+.exp-related-title { font-size: 0.81rem; font-weight: 500; color: var(--text); line-height: 1.4; margin-bottom: 3px; }
+.exp-related-title a { color: inherit; }
+.exp-related-title a:hover { color: var(--accent); }
+.exp-related-meta { font-size: 0.72rem; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -448,6 +533,7 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
     <button class="tab-btn" data-tab="mylist" onclick="switchTab('mylist')">📚 My List</button>
+    <button class="tab-btn" data-tab="explorations" onclick="switchTab('explorations')">🔭 Explorations</button>
     <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
   </nav>
 </header>
@@ -489,6 +575,27 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
       <div class="empty-state">
         <h3>No papers yet.</h3>
         <p>Go to Dashboard and click ＋ My List on papers you find interesting.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPLORATIONS -->
+<div id="tab-explorations" class="tab-pane">
+  <div class="explorations-layout">
+    <div class="exp-left" id="exp-left-pane"></div>
+    <div class="exp-middle" id="exp-middle-pane">
+      <div class="empty-state">
+        <h3>Select a paper</h3>
+        <p>Click a paper on the left to open its exploration dashboard.</p>
+      </div>
+    </div>
+    <div class="exp-right" id="exp-right-pane">
+      <div class="exp-right-header">Related Papers</div>
+      <div id="exp-related-list">
+        <div class="empty-state" style="padding:24px 12px;">
+          <p>Select a paper to see related work.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -895,6 +1002,7 @@ function tagSty(tag) {
 // MY LIST
 // ============================================================
 function renderMyList() {
+  renderExplorationsList();
   const feed = document.getElementById('mylist-feed');
   const entries = Object.values(myListState).sort((a,b) => (b.added_at||'').localeCompare(a.added_at||''));
   if (!entries.length) {
@@ -948,6 +1056,7 @@ function mlCardHtml(entry) {
   <textarea class="ml-notes" placeholder="Notes…"
     onblur="saveMlEntry('${escA(pid)}',{notes:this.value})">${esc(entry.notes||'')}</textarea>
   ${summaryBlock}
+  <button class="btn-action btn-explore" onclick="openExploration('${escA(pid)}')">🔭 Explore</button>
 </div>`;
 }
 
@@ -1245,6 +1354,91 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
+
+// --- Explorations ---
+let activeExplorationPid = null;
+
+function openExploration(pid) {
+  switchTab('explorations');
+  fetch('/api/explorations/' + encodeURIComponent(pid) + '/init', {method:'POST'}).catch(()=>{});
+  selectExplorationPaper(pid);
+}
+
+function renderExplorationsList() {
+  const pane = document.getElementById('exp-left-pane');
+  if (!pane) return;
+  const entries = Object.values(myListState).sort((a,b) => (b.added_at||'').localeCompare(a.added_at||''));
+  if (!entries.length) {
+    pane.innerHTML = '<div class="empty-state" style="padding:20px 14px;font-size:0.83rem;">No papers in My List yet.</div>';
+    return;
+  }
+  pane.innerHTML = entries.map(e => {
+    const p = e.paper || {};
+    const pid = e.paper_id;
+    const authors = (p.authors||[]);
+    const authStr = authors.length <= 2 ? authors.join(', ') : authors[0] + ' et al.';
+    const isActive = pid === activeExplorationPid;
+    return '<div class="exp-paper-item' + (isActive?' active':'') + '" id="expi-' + cId(pid) + '" onclick="selectExplorationPaper(' + JSON.stringify(pid) + ')">'
+      + '<div class="exp-paper-title">' + esc(p.title||'Untitled') + '</div>'
+      + '<div class="exp-paper-meta">' + esc(authStr) + (p.date?' · '+esc(p.date):'') + '</div>'
+      + (e.status ? '<span class="exp-paper-status">' + esc(e.status) + '</span>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function selectExplorationPaper(pid) {
+  if (activeExplorationPid) {
+    const prev = document.getElementById('expi-' + cId(activeExplorationPid));
+    if (prev) prev.classList.remove('active');
+  }
+  activeExplorationPid = pid;
+  const cur = document.getElementById('expi-' + cId(pid));
+  if (cur) cur.classList.add('active');
+
+  const mid = document.getElementById('exp-middle-pane');
+  const entry = myListState[pid] || {};
+  const p = entry.paper || {};
+  mid.innerHTML = '<div style="color:var(--muted);font-size:0.88rem;text-align:center;padding:60px 20px;">'
+    + '<h2 style="color:var(--text);font-size:1.1rem;margin-bottom:8px;">' + esc(p.title||'Untitled') + '</h2>'
+    + '<p>Exploration dashboard coming soon.</p></div>';
+
+  renderRelatedPapers(pid);
+}
+
+function renderRelatedPapers(pid) {
+  const list = document.getElementById('exp-related-list');
+  const entry = myListState[pid] || {};
+  const p = entry.paper || {};
+  const myTags = (entry.tags || []).map(t => t.toLowerCase());
+  const myAuthors = (p.authors || []).map(a => a.toLowerCase());
+  const myTitle = (p.title || '').toLowerCase();
+
+  const candidates = allPapers.filter(x => x.id !== pid).map(x => {
+    let score = 0;
+    const xTags = (x.tags || []).map(t => t.toLowerCase());
+    const xAuthors = (x.authors || []).map(a => a.toLowerCase());
+    const xTitle = (x.title || '').toLowerCase();
+    myTags.forEach(t => { if (xTags.includes(t)) score += 3; });
+    myAuthors.forEach(a => { if (xAuthors.includes(a)) score += 2; });
+    const myWords = myTitle.split(/\W+/).filter(w => w.length > 4);
+    myWords.forEach(w => { if (xTitle.includes(w)) score += 1; });
+    return { paper: x, score };
+  }).filter(x => x.score > 0).sort((a,b) => b.score - a.score).slice(0, 15);
+
+  if (!candidates.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px 12px;font-size:0.82rem;"><p>No related papers found.<br>Add tags to your paper for better matches.</p></div>';
+    return;
+  }
+  list.innerHTML = candidates.map(function(item) {
+    const x = item.paper;
+    const authors = (x.authors||[]);
+    const authStr = authors.length <= 2 ? authors.join(', ') : authors[0] + ' et al.';
+    return '<div class="exp-related-item">'
+      + '<div class="exp-related-title"><a href="' + escA(x.url||'#') + '" target="_blank">' + esc(x.title||'Untitled') + '</a></div>'
+      + '<div class="exp-related-meta">' + esc(authStr) + (x.date?' · '+esc(x.date):'') + '</div>'
+      + '</div>';
+  }).join('');
+}
 </script>
 </body>
 </html>"""
@@ -1253,6 +1447,38 @@ function showToast(msg) {
 # ---------------------------------------------------------------------------
 # Routes — existing
 # ---------------------------------------------------------------------------
+
+EXPLORATIONS_DIR = BASE_DIR / "output" / "explorations"
+EXPLORATIONS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.post("/api/explorations/{paper_id}/init")
+async def init_exploration(paper_id: str):
+    safe = _safe_filename(paper_id)
+    folder = EXPLORATIONS_DIR / safe
+    folder.mkdir(parents=True, exist_ok=True)
+    notes = folder / "notes.md"
+    if not notes.exists():
+        notes.touch()
+    refs = folder / "references.json"
+    if not refs.exists():
+        refs.write_text("[]")
+    meta = folder / "meta.json"
+    if not meta.exists():
+        meta.write_text(json.dumps({"paper_id": paper_id, "created_at": datetime.datetime.utcnow().isoformat()}, indent=2))
+    return {"folder": str(folder), "paper_id": paper_id}
+
+
+@app.get("/api/explorations")
+async def list_explorations():
+    folders = []
+    for f in EXPLORATIONS_DIR.iterdir():
+        if f.is_dir():
+            meta_path = f / "meta.json"
+            if meta_path.exists():
+                folders.append(json.loads(meta_path.read_text()))
+    return folders
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
