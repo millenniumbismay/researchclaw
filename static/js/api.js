@@ -251,12 +251,6 @@ async function selectExplorationPaper(pid) {
 
   await fetch('/api/explorations/' + encodeURIComponent(pid) + '/init', {method:'POST'});
 
-  const mid = document.getElementById('exp-middle-pane');
-  const entry = myListState[pid] || {};
-  const p = entry.paper || {};
-  mid.innerHTML = '<div style="color:var(--muted);font-size:0.88rem;text-align:center;padding:60px 20px;">'
-    + '<h2 style="color:var(--text);font-size:1.1rem;margin-bottom:8px;">' + esc(p.title||'Untitled') + '</h2>'
-    + '<p>Exploration dashboard coming soon.</p></div>';
-
+  loadSurvey(pid);
   renderRelatedPapers(pid);
 }

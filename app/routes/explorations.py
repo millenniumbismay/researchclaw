@@ -3,6 +3,13 @@ import datetime
 from fastapi import APIRouter
 from app.config import settings
 from app.utils import safe_filename
+from app.models.literature_survey import SurveyStatusResponse
+from app.services.literature_survey_service import (
+    get_survey,
+    get_survey_status,
+    start_survey_generation,
+)
+from app.services.paper_service import get_all_papers
 
 router = APIRouter(tags=["explorations"])
 
@@ -38,3 +45,18 @@ async def init_exploration(paper_id: str):
             indent=2
         ))
     return {"folder": str(folder), "paper_id": paper_id, "created": created}
+
+
+@router.get("/api/explorations/{paper_id}/survey", response_model=SurveyStatusResponse)
+async def get_survey_status_route(paper_id: str):
+    status = get_survey_status(paper_id)
+    survey = get_survey(paper_id) if status == "ready" else None
+    return SurveyStatusResponse(paper_id=paper_id, status=status, survey=survey)
+
+
+@router.post("/api/explorations/{paper_id}/survey/generate", response_model=SurveyStatusResponse)
+async def generate_survey_route(paper_id: str):
+    all_papers = get_all_papers()
+    status = start_survey_generation(paper_id, all_papers)
+    survey = get_survey(paper_id) if status == "ready" else None
+    return SurveyStatusResponse(paper_id=paper_id, status=status, survey=survey)

@@ -78,3 +78,54 @@
 .exp-related-title a { color: inherit; }
 .exp-related-title a:hover { color: var(--accent); }
 .exp-related-meta { font-size: 0.72rem; color: var(--muted); }
+
+/* ---- Literature Survey ---- */
+.survey-section-title {
+  font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--muted); margin-bottom: 14px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.survey-graph-wrap {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 24px; overflow: hidden;
+  position: relative;
+}
+.survey-graph-wrap svg { display: block; width: 100%; }
+.survey-tooltip {
+  position: absolute; background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; pointer-events: none;
+  max-width: 240px; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  opacity: 0; transition: opacity 0.12s; line-height: 1.5;
+}
+.survey-text-body {
+  font-size: 0.88rem; line-height: 1.78; color: #bbbdd4;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 26px; margin-bottom: 24px;
+}
+.survey-text-body h3 {
+  font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); margin: 18px 0 8px;
+}
+.survey-text-body h3:first-child { margin-top: 0; }
+.survey-text-body p { margin-bottom: 14px; }
+.survey-text-body p:last-child { margin-bottom: 0; }
+.survey-text-body strong { color: var(--accent); font-weight: 600; }
+.btn-generate-survey {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(124,106,247,0.12); color: var(--accent);
+  border: 1px solid rgba(124,106,247,0.3); border-radius: 8px;
+  padding: 10px 20px; font-size: 0.88rem; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.btn-generate-survey:hover { background: rgba(124,106,247,0.22); }
+.survey-generating {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 16px; padding: 60px 20px; color: var(--muted);
+  font-size: 0.88rem;
+}
+.survey-spinner {
+  width: 32px; height: 32px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
