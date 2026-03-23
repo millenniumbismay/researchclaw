@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ResearchClaw</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="/static/css/base.css"/>
+<link rel="stylesheet" href="/static/css/components.css"/>
+<link rel="stylesheet" href="/static/css/dashboard.css"/>
+<link rel="stylesheet" href="/static/css/mylist.css"/>
+<link rel="stylesheet" href="/static/css/explorations.css"/>
+<link rel="stylesheet" href="/static/css/settings.css"/>
+</head>
+<body>
+
+<header>
+  <h1>🔬 ResearchClaw</h1>
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab-btn" data-tab="mylist" onclick="switchTab('mylist')">📚 My List</button>
+    <button class="tab-btn" data-tab="explorations" onclick="switchTab('explorations')">🔭 Explorations</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
+  </nav>
+</header>
+
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="tab-pane active">
+  <div class="main-content">
+    <div class="chart-wrap">
+      <div class="chart-title">Papers Crawled (Last 90 Days)</div>
+      <canvas id="crawl-chart" height="70"></canvas>
+    </div>
+    <div class="filter-bar">
+      <input class="filter-input" id="filter-search" type="text" placeholder="Search title, authors…" oninput="applyFilters()"/>
+      <div class="filter-sep"></div>
+      <div id="fsrc" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></div>
+      <div class="filter-sep"></div>
+      <div class="tag-filter-wrap">
+        <button class="tag-filter-btn" id="tag-filter-btn" onclick="toggleTagMenu()">Tags ▾</button>
+        <div class="tag-filter-menu" id="tag-filter-menu"></div>
+      </div>
+      <div class="filter-sep"></div>
+      <span class="filter-label">Min conf:</span>
+      <input class="filter-range" id="filter-conf" type="range" min="0" max="5" step="1" value="0" oninput="document.getElementById('conf-val').textContent=this.value;applyFilters()"/>
+      <span id="conf-val" style="font-size:0.8rem;color:var(--accent);font-weight:600;min-width:12px;">0</span>
+      <div class="filter-sep"></div>
+      <span class="filter-label">From:</span>
+      <input class="filter-date" id="filter-from" type="date" onchange="applyFilters()"/>
+      <span class="filter-label">To:</span>
+      <input class="filter-date" id="filter-to" type="date" onchange="applyFilters()"/>
+    </div>
+    <div id="paper-feed"><div class="empty-state"><p>Loading papers…</p></div></div>
+  </div>
+</div>
+
+<!-- MY LIST -->
+<div id="tab-mylist" class="tab-pane">
+  <div class="main-content">
+    <div id="mylist-feed">
+      <div class="empty-state">
+        <h3>No papers yet.</h3>
+        <p>Go to Dashboard and click ＋ My List on papers you find interesting.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPLORATIONS -->
+<div id="tab-explorations" class="tab-pane">
+  <div class="explorations-layout">
+    <div class="exp-left" id="exp-left-pane"></div>
+    <div class="exp-middle" id="exp-middle-pane">
+      <div class="empty-state">
+        <h3>Select a paper</h3>
+        <p>Click a paper on the left to open its exploration dashboard.</p>
+      </div>
+    </div>
+    <div class="exp-right" id="exp-right-pane">
+      <div class="exp-right-header">Related Papers</div>
+      <div id="exp-related-list">
+        <div class="empty-state" style="padding:24px 12px;">
+          <p>Select a paper to see related work.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="tab-settings" class="tab-pane">
+  <div class="main-content">
+    <div class="card">
+      <h2>Topics</h2>
+      <div class="chip-row" id="chips-topics"></div>
+      <div class="chip-input-row">
+        <input id="input-topics" type="text" placeholder="Add topic…"/>
+        <button class="btn-small" onclick="addChip('topics')">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Keywords</h2>
+      <div class="chip-row" id="chips-keywords"></div>
+      <div class="chip-input-row">
+        <input id="input-keywords" type="text" placeholder="Add keyword…"/>
+        <button class="btn-small" onclick="addChip('keywords')">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Authors</h2>
+      <div class="chip-row" id="chips-authors"></div>
+      <div class="chip-input-row">
+        <input id="input-authors" type="text" placeholder="Add author…"/>
+        <button class="btn-small" onclick="addChip('authors')">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Venues</h2>
+      <div class="chip-row" id="chips-venues"></div>
+      <div class="chip-input-row">
+        <input id="input-venues" type="text" placeholder="Add venue…"/>
+        <button class="btn-small" onclick="addChip('venues')">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Sources</h2>
+      <div class="sources-grid" id="sources-grid"></div>
+    </div>
+    <div class="card">
+      <h2>Settings</h2>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="days_lookback">Days lookback</label>
+          <input type="number" id="days_lookback" min="1" max="365" step="1"/>
+        </div>
+        <div class="field">
+          <label for="max_results_per_source">Max results per source</label>
+          <input type="number" id="max_results_per_source" min="1" max="500" step="1"/>
+        </div>
+        <div class="field">
+          <label>Min relevance score (<span id="score-display">0.3</span>)</label>
+          <div class="slider-row">
+            <input type="range" id="min_relevance_score" min="0" max="1" step="0.05"
+                   oninput="document.getElementById('score-display').textContent=(+this.value).toFixed(2);document.getElementById('slider-val-display').textContent=(+this.value).toFixed(2)"/>
+            <span class="slider-val" id="slider-val-display">0.30</span>
+          </div>
+        </div>
+        <div class="field full-width">
+          <label for="twitter_search_query">Twitter search query</label>
+          <input type="text" id="twitter_search_query" placeholder="Auto-generated from topics/keywords"/>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="display:flex;gap:12px;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:16px 24px;">
+      <span class="status-msg" id="status-msg"></span>
+      <button class="btn btn-save" onclick="savePrefs()">💾 Save Preferences</button>
+      <button class="btn btn-run" id="btn-run" onclick="runCrawl()">
+        <span class="spinner" id="run-spinner"></span>
+        <span id="run-label">🚀 Run Crawl Now</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/state.js"></script>
+<script src="/static/js/api.js"></script>
+<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/mylist.js"></script>
+<script src="/static/js/explorations.js"></script>
+<script src="/static/js/settings.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
