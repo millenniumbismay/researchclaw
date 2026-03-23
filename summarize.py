@@ -7,12 +7,14 @@ saves individual .md files, regenerates the output/index.md, and sends a Telegra
 import json
 import os
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
 import anthropic
 import requests
 import yaml
+from bs4 import BeautifulSoup
 
 # Note: the original spec requested claude-3-5-haiku-20241022, which was retired
 # on Feb 19, 2026. Using claude-haiku-4-5 as its current replacement.
@@ -20,9 +22,9 @@ MODEL = "claude-haiku-4-5"
 
 SUMMARY_PROMPT = """You are a research paper analyst for an expert ML researcher. Produce a structured summary with these exact sections:
 
-**Abstract** (keep verbatim — copy it exactly)
+**Abstract** (copy verbatim from the paper text below)
 
-**Conclusion** (keep verbatim if available — if not in the text provided, write "See paper")
+**Conclusion** (copy verbatim from the paper text if present, otherwise write "See paper")
 
 **Introduction Highlights**
 - What problem does this paper solve?
@@ -36,13 +38,13 @@ List the explicit or implicit research questions this paper investigates. If not
 - Key methodologies and model architecture
 - Important technical details: loss functions, reward signals, key equations (use LaTeX if helpful)
 - Why this approach is preferred over alternatives
-- Key experimental findings (highlight best results, do NOT copy full tables — summarize the most important numbers)
+- Key experimental findings (highlight best results only — do NOT copy tables)
 
 Paper title: {title}
 Authors: {authors}
-Abstract: {abstract}
 
-Note: We only have the abstract. For Conclusion, Introduction Highlights, Research Questions, and Methodology, do your best inference from the abstract. Mark inferred sections with "(inferred from abstract)"."""
+Paper content:
+{full_text_or_abstract}"""
 
 
 def load_preferences(path: str = "preferences.yaml") -> dict:
@@ -74,16 +76,80 @@ def write_summary_file(output_dir: Path, title: str, summary: str) -> Path:
     return path
 
 
+def fetch_full_text(url: str) -> str:
+    """Fetch full paper text from arXiv HTML. Returns "" on any failure."""
+    # Extract arXiv ID from URL
+    match = re.search(r"arxiv\.org/abs/([\w.]+?)(?:v\d+)?$", url)
+    if not match:
+        return ""
+    arxiv_id = match.group(1)
+
+    html_url = f"https://arxiv.org/html/{arxiv_id}"
+    try:
+        resp = requests.get(
+            html_url,
+            timeout=20,
+            headers={"User-Agent": "ResearchCrawl/1.0 (research paper summarizer)"},
+        )
+        time.sleep(0.5)
+        if resp.status_code == 404:
+            return ""
+        resp.raise_for_status()
+    except Exception:
+        return ""
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    # Try targeted sections first
+    target_classes = ("abstract", "introduction", "conclusion", "method", "experiment", "result")
+    sections = []
+    for section in soup.find_all("section"):
+        cls = " ".join(section.get("class", [])).lower()
+        if any(t in cls for t in target_classes):
+            sections.append(section.get_text(separator=" ", strip=True))
+
+    if not sections:
+        # Fall back to <p> tags inside <article> or <main>
+        container = soup.find("article") or soup.find("main")
+        if container:
+            sections = [p.get_text(separator=" ", strip=True) for p in container.find_all("p")]
+
+    if not sections:
+        return ""
+
+    text = " ".join(sections)
+
+    # Clean up
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\[\d+(?:,\s*\d+)*\]", "", text)  # reference markers [1], [1,2]
+    lines = text.split(". ")
+    lines = [l for l in lines if not re.match(r"^\s*Figure\s+\d+", l, re.IGNORECASE)]
+    lines = [l for l in lines if not re.match(r"^\s*Table\s+\d+", l, re.IGNORECASE)]
+    text = ". ".join(lines)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text[:12000]
+
+
 def generate_summary(client: anthropic.Anthropic, paper: dict) -> str:
     """Call Claude API to produce a rich structured summary of a paper."""
     authors_str = ", ".join(paper.get("authors", [])[:5])
     if len(paper.get("authors", [])) > 5:
         authors_str += " et al."
 
+    full_text = fetch_full_text(paper.get("url", ""))
+    if len(full_text) > 500:
+        full_text_or_abstract = full_text
+    else:
+        abstract = paper.get("abstract", "")[:3000]
+        full_text_or_abstract = (
+            abstract + "\n\n(inferred from abstract only)"
+        )
+
     prompt = SUMMARY_PROMPT.format(
         title=paper["title"],
         authors=authors_str,
-        abstract=paper.get("abstract", "")[:3000],
+        full_text_or_abstract=full_text_or_abstract,
     )
     response = client.messages.create(
         model=MODEL,

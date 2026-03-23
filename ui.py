@@ -418,7 +418,7 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
 .full-width { grid-column: 1 / -1; }
 
 /* action bar */
-.action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(26,29,39,0.96); backdrop-filter: blur(12px); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 28px; z-index: 100; }
+/* .action-bar removed — Save + Run now inside Settings tab */
 .btn { display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 8px; padding: 9px 20px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background 0.15s, opacity 0.15s; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-save { background: var(--card); color: var(--text); border: 1px solid var(--border); }
@@ -545,11 +545,11 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
           <input type="number" id="max_results_per_source" min="1" max="500" step="1"/>
         </div>
         <div class="field">
-          <label>Min relevance score (<span id="score-display">0.6</span>)</label>
+          <label>Min relevance score (<span id="score-display">0.3</span>)</label>
           <div class="slider-row">
             <input type="range" id="min_relevance_score" min="0" max="1" step="0.05"
                    oninput="document.getElementById('score-display').textContent=(+this.value).toFixed(2);document.getElementById('slider-val-display').textContent=(+this.value).toFixed(2)"/>
-            <span class="slider-val" id="slider-val-display">0.60</span>
+            <span class="slider-val" id="slider-val-display">0.30</span>
           </div>
         </div>
         <div class="field full-width">
@@ -558,10 +558,18 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
         </div>
       </div>
     </div>
+    <div class="card" style="display:flex;gap:12px;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:16px 24px;">
+      <span class="status-msg" id="status-msg"></span>
+      <button class="btn btn-save" onclick="savePrefs()">💾 Save Preferences</button>
+      <button class="btn btn-run" id="btn-run" onclick="runCrawl()">
+        <span class="spinner" id="run-spinner"></span>
+        <span id="run-label">🚀 Run Crawl Now</span>
+      </button>
+    </div>
   </div>
 </div>
 
-<!-- ACTION BAR -->
+<!-- ACTION BAR REMOVED -->
 <div class="action-bar">
   <span class="status-msg" id="status-msg"></span>
   <button class="btn btn-save" onclick="savePrefs()">💾 Save Preferences</button>
@@ -1124,7 +1132,7 @@ function applyPrefs(prefs) {
   (prefs.sources||[]).forEach(s => { const el = document.getElementById('src-'+s); if(el) el.checked=true; });
   if (prefs.days_lookback) document.getElementById('days_lookback').value = prefs.days_lookback;
   if (prefs.max_results_per_source) document.getElementById('max_results_per_source').value = prefs.max_results_per_source;
-  const score = prefs.min_relevance_score ?? 0.6;
+  const score = prefs.min_relevance_score ?? 0.3;
   document.getElementById('min_relevance_score').value = score;
   document.getElementById('score-display').textContent = score.toFixed(2);
   document.getElementById('slider-val-display').textContent = score.toFixed(2);
@@ -1511,6 +1519,7 @@ async def summarize_paper_on_demand(paper_id: str):
             "title": target_paper["title"],
             "authors": target_paper["authors"],
             "abstract": target_paper.get("abstract", ""),
+            "url": target_paper.get("url", ""),
         })
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
