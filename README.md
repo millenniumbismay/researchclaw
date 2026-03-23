@@ -42,7 +42,8 @@ A dark-mode web UI (FastAPI + vanilla JS) with three tabs:
 - **Stacked bar chart** — papers crawled per day, broken down by confidence level (3/4/5) over the last 90 days
 - **Paper feed** — grouped by date, with tag chips, confidence badges, and source labels
 - **One-click actions** — "＋ My List" to save, "✕ Not Relevant" to dismiss (and delete the files)
-- **Expandable summaries** — click "📄 Show Summary" to read inline; "✨ Summarize" to generate on demand for any paper
+- **Expandable abstract** — click "▼ Abstract" on any card to read the full abstract inline
+- **Expandable summaries** — click "📄 Show Summary" to read Claude-generated summary inline; "✨ Summarize" to generate on demand for any paper
 - **Client-side filters** — by tag, source, confidence level, date range, and free-text search
 
 ### 📚 My List

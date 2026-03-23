@@ -790,7 +790,7 @@ function paperCardHtml(p) {
   <div class="paper-card-body" onclick="toggleSummary('${escA(p.id)}')">
     <div class="paper-title">
       <a href="${escA(p.url)}" target="_blank" onclick="event.stopPropagation()">${esc(p.title)}</a>
-      <span class="expand-hint" id="eh-${cid}">${expanded?'▲':'▼'}</span>
+      <span class="expand-hint" id="eh-${cid}">${expanded?'▲ Abstract':'▼ Abstract'}</span>
     </div>
     <div class="paper-meta">
       <span>${esc(authStr)}</span>${p.date?`<span>· ${esc(p.date)}</span>`:''}
@@ -799,7 +799,7 @@ function paperCardHtml(p) {
   </div>
   <div class="paper-actions">${actBtns}${summaryBtn}</div>
   <div class="dash-summary-panel" id="dsp-${cid}">${hasSummary ? mdToHtml(p.summary) : ''}</div>
-  <div class="paper-summary${expanded?' open':''}" id="ps-${cid}">${mdToHtml(p.summary||'')}</div>
+  <div class="paper-summary${expanded?' open':''}" id="ps-${cid}"><p style="margin:0;white-space:pre-wrap">${esc(p.abstract||'')}</p></div>
 </div>`;
 }
 
