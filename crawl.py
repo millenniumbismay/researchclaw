@@ -1,5 +1,5 @@
 """
-ResearchCrawl - crawl.py
+ResearchClaw - crawl.py
 Fetches research papers from arXiv, Semantic Scholar, HuggingFace Daily Papers,
 and Twitter/X, scores relevance, and saves new papers to filtered_papers.json
 for summarize.py to process.

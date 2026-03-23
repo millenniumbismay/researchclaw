@@ -1,4 +1,4 @@
-"""ResearchCrawl UI — FastAPI app with Dashboard, My List, and Settings tabs."""
+"""ResearchClaw UI — FastAPI app with Dashboard, My List, and Settings tabs."""
 
 import json
 import re
@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 # ---------------------------------------------------------------------------
 # App + CORS
 # ---------------------------------------------------------------------------
-app = FastAPI(title="ResearchCrawl UI")
+app = FastAPI(title="ResearchClaw UI")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -187,7 +187,7 @@ HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>ResearchCrawl</title>
+<title>ResearchClaw</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -444,7 +444,7 @@ header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; paddin
 <body>
 
 <header>
-  <h1>🔬 ResearchCrawl</h1>
+  <h1>🔬 ResearchClaw</h1>
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
     <button class="tab-btn" data-tab="mylist" onclick="switchTab('mylist')">📚 My List</button>
@@ -1555,7 +1555,7 @@ async def output_index():
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>ResearchCrawl — Index</title>
+<title>ResearchClaw — Index</title>
 <style>
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{
@@ -1580,7 +1580,7 @@ async def output_index():
 </head>
 <body>
 <div class="content">
-  <a href="/" class="back">← Back to ResearchCrawl</a>
+  <a href="/" class="back">← Back to ResearchClaw</a>
   {body}
 </div>
 </body>

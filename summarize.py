@@ -1,5 +1,5 @@
 """
-ResearchCrawl - summarize.py
+ResearchClaw - summarize.py
 Reads filtered_papers.json, generates Claude-powered structured summaries for new papers,
 saves individual .md files, regenerates the output/index.md, and sends a Telegram notification.
 """
@@ -89,7 +89,7 @@ def fetch_full_text(url: str) -> str:
         resp = requests.get(
             html_url,
             timeout=20,
-            headers={"User-Agent": "ResearchCrawl/1.0 (research paper summarizer)"},
+            headers={"User-Agent": "ResearchClaw/1.0 (research paper summarizer)"},
         )
         time.sleep(0.5)
         if resp.status_code == 404:
@@ -254,7 +254,7 @@ def regenerate_index(output_dir: Path, all_papers_meta: list, topics: list):
         groups.setdefault(topic, []).append(paper)
 
     lines = [
-        "# ResearchCrawl Index",
+        "# ResearchClaw Index",
         "",
         f"*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}*",
         f"*Total papers: {len(sorted_papers)}*",
@@ -425,7 +425,7 @@ def main():
         top_papers_text = "\n".join(top_lines) if top_lines else "—"
 
         message = (
-            f"🔬 <b>ResearchCrawl Complete</b>\n\n"
+            f"🔬 <b>ResearchClaw Complete</b>\n\n"
             f"📄 <b>{processed} new papers</b> summarized today\n"
             f"🏷 Topics covered: {tags_joined}\n\n"
             f"Top papers:\n{top_papers_text}\n\n"

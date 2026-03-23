@@ -5,4 +5,4 @@ cd "$(dirname "$0")"
 set -a && source .env && set +a
 python crawl.py
 python summarize.py
-echo "ResearchCrawl complete. See output/index.md"
+echo "ResearchClaw complete. See output/index.md"
