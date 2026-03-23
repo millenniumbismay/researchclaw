@@ -2,7 +2,7 @@
 
 > **Your personal AI-powered research paper curator.** Set your interests once, get a daily digest of the most relevant papers — tagged, scored, and summarized by Claude.
 
-https://github.com/millenniumbismay/researchclaw/raw/main/assets/demo.mp4
+![ResearchClaw Demo](assets/demo.gif)
 
 ---
 
