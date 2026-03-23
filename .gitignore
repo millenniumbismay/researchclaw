@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Generated runtime data
+filtered_papers.json
+papers_cache.json
+feedback.json
+mylist.json
+dashboard_store.json
+crawl_history.json
+
+# Output (generated, not source)
+output/
+
+# OS
+.DS_Store

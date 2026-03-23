@@ -1,0 +1,47 @@
+authors: []
+days_lookback: 7
+keywords:
+- transformer
+- RLHF
+- fine-tuning
+- reasoning
+- latent reasoning
+- joint embedding
+- latent
+- memory
+- multimodal
+- self improving
+- self evolving
+- latent memory
+- evolutionary
+- video reasoning
+- decoding
+- self reflection
+- agents
+- openclaw
+- open research
+- vlm
+- llm
+- slm
+- test time training
+- inference
+max_results_per_source: 20
+min_relevance_score: 0.75
+sources:
+- arxiv
+- semantic_scholar
+- huggingface
+topics:
+- machine learning
+- large language models
+- AI safety
+- JEPA
+- Reinforcement Learning
+- Flow matching
+- semantic tube
+- Video Language Model
+- small language model
+- Language Diffusion Model
+- Diffusion Model
+- Agentic Systems
+venues: []

@@ -1,0 +1,11 @@
+# Core
+requests>=2.31.0
+anthropic>=0.40.0
+pyyaml>=6.0
+python-dateutil>=2.9.0
+beautifulsoup4>=4.12.0
+
+# Web UI
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+markdown>=3.7
