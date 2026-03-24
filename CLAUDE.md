@@ -65,6 +65,7 @@ conda activate ar # Activate conda env
 - Modify only the required file. Do not change upstream or downstream files until absolutely necessary. Always ask yourself, can the change be self-contained? If yes, then modify the concerned file
 - Always make sure that upstream and downstream code flow is compatible
 - If in doubt of implementation, invoke the Planner agent
+- **Subagents:** Only spawn subagents when the task has clear development boundaries (well-defined input, output, and scope). Every subagent prompt must include: the specific file paths and line numbers involved, the exact problem or task, relevant constraints and edge cases, what "done" looks like, and any upstream/downstream contracts — subagents have zero conversation context, so the prompt is their entire briefing.
 
 ### Code Review
 
