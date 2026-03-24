@@ -75,7 +75,7 @@ conda activate ar # Activate conda env
 ## Log and Summary
 
 - Create a log file of the changes done during a session with appropriate timestamp and store it in `/Users/mbismay/Projects/researchclaw/docs/logs`
-- Once a feature or set of features are developed, update `/Users/mbismay/Projects/researchclaw/docs/researchclaw.md` with relevant changes in appropriate sections only
+- Once a feature or set of features are developed, update `/Users/mbismay/Projects/researchclaw/docs/researchclaw.md` with relevant changes in appropriate sections only. If a section is not present, then create a new section for it.
 - Update `CLAUDE.md` with crucial information which will help the agents to plan and develop better in future.
 - Update the `/Users/mbismay/.claude/projects/-Users-mbismay-Projects-researchclaw/memory/MEMORY.md` with relevant meta information
 
