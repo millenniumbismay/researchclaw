@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from app.config import settings
 from app.utils import load_json, save_json
 from app.services.paper_service import get_paper_by_id, get_paper_path_by_id
+from app.services.paper_content_service import fetch_content_background
 
 router = APIRouter(tags=["feedback"])
 
@@ -34,6 +35,9 @@ async def post_feedback(body: dict):
                     "added_at": now,
                     "paper": paper_meta,
                 }
+                # Fetch full paper content from source in background
+                paper_url = (paper_meta or {}).get("url", "")
+                fetch_content_background(paper_id, paper_url)
         elif action == "not_relevant":
             mylist_data.pop(paper_id, None)
             paper_path = get_paper_path_by_id(paper_id)

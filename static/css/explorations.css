@@ -94,7 +94,7 @@
 .survey-tooltip {
   position: absolute; background: var(--card); border: 1px solid var(--border);
   border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; pointer-events: none;
-  max-width: 240px; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  max-width: 340px; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
   opacity: 0; transition: opacity 0.12s; line-height: 1.5;
 }
 .survey-text-body {
@@ -173,3 +173,31 @@
   line-height: 1.7;
 }
 .survey-directions-placeholder p { margin-bottom: 18px; }
+
+/* Staleness banner */
+.survey-stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  background: rgba(247,183,106,0.1);
+  border: 1px solid rgba(247,183,106,0.3);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  color: var(--warn);
+}
+.survey-stale-banner span { flex: 1; }
+.btn-regenerate {
+  background: rgba(247,183,106,0.15);
+  color: var(--warn);
+  border: 1px solid rgba(247,183,106,0.35);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-regenerate:hover { background: rgba(247,183,106,0.25); }

@@ -1,4 +1,4 @@
-"""Literature Survey Service — generates D3 knowledge graphs and AI-written academic surveys."""
+"""Related Works Service — generates multi-hop D3 knowledge graphs with rich edge annotations."""
 
 import json
 import logging
@@ -26,13 +26,17 @@ MODEL = "claude-haiku-4-5"
 _generating: set[str] = set()
 _lock = threading.Lock()
 
+# Fan-out per hop level: (top_n papers to find, hop level)
+HOP_CONFIG = [(6, 1), (3, 2), (2, 3)]
+
 
 # ============================================================
 # Related Paper Scoring
 # ============================================================
 
 def find_related_papers(
-    focal_paper: dict, all_papers: list[dict], top_n: int = 12
+    focal_paper: dict, all_papers: list[dict], top_n: int = 12,
+    exclude_ids: set | None = None,
 ) -> list[tuple[dict, float]]:
     """Score all papers by relevance to focal paper and return top N with normalized scores."""
     focal_tags = [t.lower() for t in (focal_paper.get("tags") or [])]
@@ -45,10 +49,12 @@ def find_related_papers(
     )
 
     focal_id = focal_paper.get("id")
+    skip_ids = {focal_id} | (exclude_ids or set())
     candidates = []
 
     for paper in all_papers:
-        if paper.get("id") == focal_id:
+        pid = paper.get("id")
+        if pid in skip_ids:
             continue
 
         score = 0.0
@@ -95,190 +101,289 @@ def find_related_papers(
 
 
 # ============================================================
-# Relation Description
+# Rich Relation Generation (batched)
 # ============================================================
 
-def _heuristic_relation(focal_paper: dict, related_paper: dict) -> str:
-    """Generate a relation description using heuristics when LLM is unavailable."""
-    focal_tags = set(t.lower() for t in (focal_paper.get("tags") or []))
-    related_tags = set(t.lower() for t in (related_paper.get("tags") or []))
-    shared_tags = focal_tags & related_tags
+def _heuristic_rich_relation(paper_a: dict, paper_b: dict) -> dict:
+    """Generate relation, commonalities, differences using heuristics."""
+    tags_a = set(t.lower() for t in (paper_a.get("tags") or []))
+    tags_b = set(t.lower() for t in (paper_b.get("tags") or []))
+    shared_tags = tags_a & tags_b
+    unique_a = tags_a - tags_b
+    unique_b = tags_b - tags_a
 
-    focal_authors = set(a.lower() for a in (focal_paper.get("authors") or []))
-    related_authors = set(a.lower() for a in (related_paper.get("authors") or []))
+    authors_a = set(a.lower() for a in (paper_a.get("authors") or []))
+    authors_b = set(a.lower() for a in (paper_b.get("authors") or []))
 
-    if focal_authors & related_authors:
-        return "shares authorship with related research"
+    # Relation
+    if authors_a & authors_b:
+        relation = "shares authorship with related research"
+    elif len(shared_tags) > 2:
+        relation = f"closely related in {next(iter(shared_tags))} domain"
+    elif shared_tags:
+        relation = f"related work in {next(iter(shared_tags))} research area"
+    else:
+        words_a = set(w for w in (paper_a.get("title") or "").lower().split() if len(w) > 4)
+        words_b = set(w for w in (paper_b.get("title") or "").lower().split() if len(w) > 4)
+        shared_words = words_a & words_b
+        if shared_words:
+            relation = f"builds on similar {next(iter(shared_words))} techniques"
+        else:
+            relation = "related work in this research area"
 
-    if len(shared_tags) > 2:
-        tag = next(iter(shared_tags))
-        return f"closely related in {tag} domain"
-
+    # Commonalities
     if shared_tags:
-        tag = next(iter(shared_tags))
-        return f"related work in {tag} research area"
+        commonalities = f"Both address {', '.join(list(shared_tags)[:3])}"
+    else:
+        commonalities = "Both contribute to related research areas"
 
-    focal_words = set(w for w in (focal_paper.get("title") or "").lower().split() if len(w) > 4)
-    related_words = set(w for w in (related_paper.get("title") or "").lower().split() if len(w) > 4)
-    shared_words = focal_words & related_words
+    # Differences
+    if unique_a and unique_b:
+        differences = f"One focuses on {next(iter(unique_a))}, the other on {next(iter(unique_b))}"
+    elif unique_a:
+        differences = f"This paper additionally covers {next(iter(unique_a))}"
+    elif unique_b:
+        differences = f"The other paper additionally covers {next(iter(unique_b))}"
+    else:
+        differences = "Different approaches to similar problems"
 
-    if shared_words:
-        keyword = next(iter(shared_words))
-        return f"builds on similar {keyword} techniques"
-
-    return "related work in this research area"
+    return {"relation": relation, "commonalities": commonalities, "differences": differences}
 
 
-def generate_relation_description(
-    focal_paper: dict,
-    related_paper: dict,
-    focal_summary: str,
-    related_summary: str,
+def generate_rich_relations_batch(
+    pairs: list[tuple[dict, dict]],
     client: Optional[anthropic.Anthropic] = None,
-) -> str:
-    """Generate a 5-8 word relation description between two papers."""
-    if client:
-        try:
-            prompt = (
-                "You are analyzing two research papers. Describe their relationship in exactly "
-                "5-8 words starting with a verb.\n"
-                'Examples: "extends transformer architecture for multimodal tasks", '
-                '"contradicts findings on attention scaling", "applies RLHF to code generation"\n\n'
-                f"Paper A: {focal_paper.get('title', '')}\n"
-                f"Summary A: {(focal_summary or focal_paper.get('abstract') or '')[:300]}\n\n"
-                f"Paper B: {related_paper.get('title', '')}\n"
-                f"Summary B: {(related_summary or related_paper.get('abstract') or '')[:300]}\n\n"
-                "Relationship (5-8 words, verb first):"
+) -> list[dict]:
+    """Generate rich relation info for multiple paper pairs.
+
+    Each pair is (paper_a, paper_b).
+    Returns list of {"relation": ..., "commonalities": ..., "differences": ...}.
+    """
+    if not pairs:
+        return []
+
+    if not client:
+        return [_heuristic_rich_relation(a, b) for a, b in pairs]
+
+    # Process in batches of 5-6 pairs per LLM call
+    BATCH_SIZE = 5
+    results = []
+
+    for batch_start in range(0, len(pairs), BATCH_SIZE):
+        batch = pairs[batch_start:batch_start + BATCH_SIZE]
+        pair_descriptions = []
+        for i, (pa, pb) in enumerate(batch, 1):
+            sum_a = (pa.get("summary") or pa.get("abstract") or "")[:200]
+            sum_b = (pb.get("summary") or pb.get("abstract") or "")[:200]
+            pair_descriptions.append(
+                f"Pair {i}:\n"
+                f"  Paper A: {pa.get('title', 'Untitled')}\n"
+                f"  Summary A: {sum_a}\n"
+                f"  Paper B: {pb.get('title', 'Untitled')}\n"
+                f"  Summary B: {sum_b}"
             )
+
+        prompt = (
+            "For each paper pair below, provide exactly 3 lines:\n"
+            "RELATION: Their relationship in 5-8 words starting with a verb\n"
+            "COMMON: What they share (1 sentence, max 25 words)\n"
+            "DIFFERENT: What distinguishes them (1 sentence, max 25 words)\n\n"
+            + "\n\n".join(pair_descriptions)
+            + "\n\nRespond with the analysis for each pair, numbered. Use exactly the format:\n"
+            "Pair N:\nRELATION: ...\nCOMMON: ...\nDIFFERENT: ..."
+        )
+
+        try:
             response = client.messages.create(
                 model=MODEL,
-                max_tokens=50,
+                max_tokens=200 * len(batch),
                 messages=[{"role": "user", "content": prompt}],
             )
+            text = ""
             for block in response.content:
                 if block.type == "text":
-                    relation = block.text.strip().strip('"').strip("'").strip()
-                    if relation:
-                        return relation
-        except Exception as e:
-            logger.warning(f"LLM relation generation failed: {e}")
+                    text = block.text.strip()
+                    break
 
-    return _heuristic_relation(focal_paper, related_paper)
+            # Parse response
+            batch_results = _parse_batch_response(text, len(batch))
+            if len(batch_results) == len(batch):
+                results.extend(batch_results)
+            else:
+                # Partial parse — fill missing with heuristics
+                for i, (pa, pb) in enumerate(batch):
+                    if i < len(batch_results):
+                        results.append(batch_results[i])
+                    else:
+                        results.append(_heuristic_rich_relation(pa, pb))
+        except Exception as e:
+            logger.warning(f"Batched relation generation failed: {e}")
+            results.extend([_heuristic_rich_relation(a, b) for a, b in batch])
+
+    return results
+
+
+def _parse_batch_response(text: str, expected_count: int) -> list[dict]:
+    """Parse batched LLM response into list of relation dicts."""
+    results = []
+    # Split by "Pair N:" markers
+    pair_blocks = re.split(r"Pair\s+\d+\s*:", text)
+    # First element is usually empty (before "Pair 1:")
+    pair_blocks = [b.strip() for b in pair_blocks if b.strip()]
+
+    for block in pair_blocks[:expected_count]:
+        relation_m = re.search(r"RELATION:\s*(.+?)(?:\n|$)", block)
+        common_m = re.search(r"COMMON:\s*(.+?)(?:\n|$)", block)
+        diff_m = re.search(r"DIFFERENT:\s*(.+?)(?:\n|$)", block)
+
+        results.append({
+            "relation": (relation_m.group(1).strip().strip('"').strip("'") if relation_m else "related work"),
+            "commonalities": (common_m.group(1).strip() if common_m else ""),
+            "differences": (diff_m.group(1).strip() if diff_m else ""),
+        })
+
+    return results
 
 
 # ============================================================
-# Survey Text Generation
+# Multi-Hop Graph Builder
 # ============================================================
 
-def _heuristic_survey(
+def build_multi_hop_graph(
     focal_paper: dict,
-    related_papers_with_relations: list[tuple[dict, str, float]],
-) -> str:
-    """Generate a structured template-based survey when LLM is unavailable."""
-    title = focal_paper.get("title", "Untitled")
-    authors = focal_paper.get("authors") or []
-    author_str = ", ".join(authors[:3]) + (" et al." if len(authors) > 3 else "")
-    abstract = focal_paper.get("abstract") or focal_paper.get("summary") or ""
-
-    # Group papers into thematic clusters by their primary tag
-    clusters: dict[str, list] = {}
-    for paper, relation, score in related_papers_with_relations:
-        tags = paper.get("tags") or []
-        key = tags[0].title() if tags else "General"
-        clusters.setdefault(key, []).append((paper, relation, score))
-
-    html_parts = []
-
-    # Introduction
-    abstract_excerpt = (abstract[:400] + "…") if len(abstract) > 400 else abstract
-    intro = (
-        f"<p><strong>{title}</strong>"
-        + (f" by {author_str}" if author_str else "")
-        + " addresses a significant problem in the research landscape. "
-        + (abstract_excerpt or "This paper makes important contributions to the field.")
-        + f" The following survey situates this work within the broader literature, "
-        f"examining {len(related_papers_with_relations)} related works.</p>"
-    )
-    html_parts.append(intro)
-
-    # Thematic clusters
-    cluster_names = list(clusters.keys())[:4]
-    for cluster_name in cluster_names:
-        cluster_papers = clusters[cluster_name]
-        html_parts.append(f"<h3>{cluster_name}</h3>")
-        descs = []
-        for paper, relation, score in cluster_papers[:4]:
-            p_title = paper.get("title", "Untitled")
-            p_authors = paper.get("authors") or []
-            p_author = p_authors[0] if p_authors else "Unknown"
-            descs.append(f"<strong>{p_title}</strong> ({p_author}) — {relation}.")
-        html_parts.append(f"<p>{'  '.join(descs)}</p>")
-
-    # Synthesis
-    html_parts.append("<h3>Synthesis</h3>")
-    html_parts.append(
-        f"<p><strong>{title}</strong> represents an important contribution to this body of work. "
-        f"Drawing from {len(related_papers_with_relations)} related works across "
-        f"{len(clusters)} research theme(s), this paper advances the field by building on "
-        "existing methodologies while addressing gaps in the current literature. "
-        "Future work in this area will likely extend the foundations established here.</p>"
-    )
-
-    return "\n".join(html_parts)
-
-
-def generate_survey_text(
-    focal_paper: dict,
-    related_papers_with_relations: list[tuple[dict, str, float]],
-    focal_summary: str,
+    all_papers: list[dict],
     client: Optional[anthropic.Anthropic] = None,
-) -> str:
-    """Generate a comprehensive academic literature survey as HTML."""
-    if client:
+) -> tuple[list[PaperNode], list[RelationEdge]]:
+    """Build a 3-hop knowledge graph with rich edge annotations.
+
+    Returns (nodes, edges) for the full multi-hop graph.
+    """
+    focal_id = focal_paper["id"]
+    seen_ids: set[str] = {focal_id}
+
+    # Focal node
+    focal_node = PaperNode(
+        id=focal_id,
+        title=focal_paper.get("title", "Untitled"),
+        authors=focal_paper.get("authors") or [],
+        date=focal_paper.get("date"),
+        url=focal_paper.get("url"),
+        relevance_score=1.0,
+        is_focal=True,
+        tags=focal_paper.get("tags") or [],
+        hop_level=0,
+    )
+
+    all_nodes: list[PaperNode] = [focal_node]
+    all_edges: list[RelationEdge] = []
+
+    # frontier: list of (paper_dict, source_paper_id) for generating edges
+    frontier: list[tuple[dict, str]] = [(focal_paper, focal_id)]
+
+    for top_n, hop_level in HOP_CONFIG:
+        next_frontier: list[tuple[dict, str]] = []
+        # Collect all pairs for batched relation generation
+        edge_pairs: list[tuple[dict, dict]] = []
+        edge_meta: list[tuple[str, str, float]] = []  # (source_id, target_id, score)
+
+        for source_paper, source_id in frontier:
+            related = find_related_papers(
+                source_paper, all_papers, top_n=top_n, exclude_ids=seen_ids
+            )
+            for rel_paper, score in related:
+                rel_id = rel_paper.get("id")
+                if rel_id in seen_ids:
+                    continue
+                seen_ids.add(rel_id)
+
+                all_nodes.append(PaperNode(
+                    id=rel_id,
+                    title=rel_paper.get("title", "Untitled"),
+                    authors=rel_paper.get("authors") or [],
+                    date=rel_paper.get("date"),
+                    url=rel_paper.get("url"),
+                    relevance_score=score,
+                    is_focal=False,
+                    tags=rel_paper.get("tags") or [],
+                    hop_level=hop_level,
+                ))
+
+                edge_pairs.append((source_paper, rel_paper))
+                edge_meta.append((source_id, rel_id, score))
+                next_frontier.append((rel_paper, rel_id))
+
+        # Generate rich relations for all edges at this hop level
+        rich_relations = generate_rich_relations_batch(edge_pairs, client)
+
+        for (source_id, target_id, score), rel_info in zip(edge_meta, rich_relations):
+            all_edges.append(RelationEdge(
+                source=source_id,
+                target=target_id,
+                relation=rel_info["relation"],
+                commonalities=rel_info.get("commonalities", ""),
+                differences=rel_info.get("differences", ""),
+                strength=score,
+            ))
+
+        frontier = next_frontier
+
+    return all_nodes, all_edges
+
+
+# ============================================================
+# Staleness Detection
+# ============================================================
+
+def check_survey_staleness(paper_id: str) -> bool:
+    """Check if the survey is stale due to new My List papers."""
+    from app.utils import load_json
+    from datetime import datetime, timezone
+
+    survey = get_survey(paper_id)
+    if not survey or survey.status != "ready":
+        return False
+
+    mylist_data = load_json(settings.mylist_path, {})
+
+    # Parse generated_at to a tz-aware datetime for reliable comparison
+    try:
+        gen_dt = datetime.fromisoformat(survey.generated_at)
+        if gen_dt.tzinfo is None:
+            gen_dt = gen_dt.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return False
+
+    # Get IDs already in the graph
+    graph_ids = {n.id for n in survey.graph.nodes}
+
+    # Extract focal paper before iterating
+    focal_entry = mylist_data.get(paper_id, {})
+    focal_paper = focal_entry.get("paper", {})
+    if not focal_paper:
+        return False
+    focal_tags = set(t.lower() for t in (focal_paper.get("tags") or []))
+
+    for pid, entry in mylist_data.items():
+        if pid == paper_id or pid in graph_ids:
+            continue
+        # Parse added_at to tz-aware datetime
+        added_at_str = entry.get("added_at", "")
+        if not added_at_str:
+            continue
         try:
-            related_lines = []
-            for paper, relation, score in related_papers_with_relations:
-                p_authors = ", ".join((paper.get("authors") or [])[:3])
-                p_summary = (paper.get("summary") or paper.get("abstract") or "")[:200]
-                related_lines.append(
-                    f"- **{paper.get('title', 'Untitled')}** by {p_authors}\n"
-                    f"  Relation to focal paper: {relation}\n"
-                    f"  Summary: {p_summary}"
-                )
+            added_dt = datetime.fromisoformat(added_at_str)
+            if added_dt.tzinfo is None:
+                added_dt = added_dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            continue
 
-            focal_authors = ", ".join((focal_paper.get("authors") or [])[:5])
-            survey_summary = focal_summary or focal_paper.get("abstract") or ""
+        if added_dt > gen_dt:
+            entry_paper = entry.get("paper", {})
+            entry_tags = set(t.lower() for t in (entry_paper.get("tags") or []))
+            if focal_tags & entry_tags:
+                return True
 
-            prompt = (
-                "You are an expert academic researcher writing a literature review section.\n\n"
-                f"FOCAL PAPER: {focal_paper.get('title', '')}\n"
-                f"Authors: {focal_authors}\n"
-                f"Abstract/Summary: {survey_summary[:600]}\n\n"
-                "RELATED PAPERS:\n"
-                + "\n".join(related_lines[:12])
-                + "\n\nWrite a comprehensive literature survey (400-600 words) covering:\n"
-                "1. An intro paragraph placing the focal paper in context\n"
-                "2. Group related papers into 2-4 thematic clusters with descriptive headers\n"
-                "3. For each cluster: what the papers contribute, how they relate to each other, "
-                "how they inform the focal paper\n"
-                "4. A synthesis paragraph on how the focal paper advances the field\n\n"
-                "Use academic writing style. Bold paper titles when mentioned. "
-                "Use HTML: <h3> for cluster headers, <p> for paragraphs, <strong> for paper titles. "
-                "Do NOT include any markdown, only HTML tags."
-            )
-
-            response = client.messages.create(
-                model=MODEL,
-                max_tokens=1500,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            for block in response.content:
-                if block.type == "text":
-                    return block.text.strip()
-        except Exception as e:
-            logger.warning(f"LLM survey generation failed: {e}")
-
-    return _heuristic_survey(focal_paper, related_papers_with_relations)
+    return False
 
 
 # ============================================================
@@ -326,8 +431,9 @@ def get_survey_status(paper_id: str) -> str:
 # ============================================================
 
 def _build_survey_sync(paper_id: str, all_papers: list[dict]) -> LiteratureSurvey:
-    """Synchronously build the full literature survey."""
+    """Synchronously build the full related works graph."""
     from app.services.paper_service import get_paper_by_id
+    from app.services.paper_content_service import get_related_work_section
 
     focal_paper = get_paper_by_id(paper_id)
     if not focal_paper:
@@ -344,64 +450,23 @@ def _build_survey_sync(paper_id: str, all_papers: list[dict]) -> LiteratureSurve
         except Exception as e:
             logger.warning(f"Failed to create Anthropic client: {e}")
 
-    focal_summary = focal_paper.get("summary") or focal_paper.get("abstract") or ""
-
-    # Find related papers
-    related = find_related_papers(focal_paper, all_papers, top_n=12)
-
-    # Generate relation descriptions
-    related_with_relations: list[tuple[dict, str, float]] = []
-    for paper, score in related:
-        related_summary = paper.get("summary") or paper.get("abstract") or ""
-        relation = generate_relation_description(
-            focal_paper, paper, focal_summary, related_summary, client
-        )
-        related_with_relations.append((paper, relation, score))
-
-    # Generate survey text
-    survey_text = generate_survey_text(focal_paper, related_with_relations, focal_summary, client)
-
-    # Build graph
-    focal_node = PaperNode(
-        id=focal_paper["id"],
-        title=focal_paper.get("title", "Untitled"),
-        authors=focal_paper.get("authors") or [],
-        date=focal_paper.get("date"),
-        url=focal_paper.get("url"),
-        relevance_score=1.0,
-        is_focal=True,
-        tags=focal_paper.get("tags") or [],
-    )
-
-    related_nodes = [
-        PaperNode(
-            id=paper["id"],
-            title=paper.get("title", "Untitled"),
-            authors=paper.get("authors") or [],
-            date=paper.get("date"),
-            url=paper.get("url"),
-            relevance_score=score,
-            is_focal=False,
-            tags=paper.get("tags") or [],
-        )
-        for paper, _, score in related_with_relations
-    ]
-
-    edges = [
-        RelationEdge(
-            source=focal_paper["id"],
-            target=paper["id"],
-            relation=relation,
-            strength=score,
-        )
-        for paper, relation, score in related_with_relations
-    ]
+    # Build multi-hop graph
+    nodes, edges = build_multi_hop_graph(focal_paper, all_papers, client)
 
     graph = LiteratureSurveyGraph(
         focal_paper_id=focal_paper["id"],
-        nodes=[focal_node] + related_nodes,
+        nodes=nodes,
         edges=edges,
     )
+
+    # Get related work from original paper (cached), fetch on-demand if not cached
+    related_work_html = get_related_work_section(paper_id)
+    if related_work_html is None:
+        from app.services.paper_content_service import fetch_and_cache_paper_content
+        paper_url = focal_paper.get("url", "")
+        fetch_and_cache_paper_content(paper_id, paper_url)
+        related_work_html = get_related_work_section(paper_id) or ""
+    related_work_source = "arxiv_html" if related_work_html else "none"
 
     # Save related papers to exploration folder
     folder = settings.explorations_dir / safe_filename(focal_paper["id"])
@@ -409,18 +474,24 @@ def _build_survey_sync(paper_id: str, all_papers: list[dict]) -> LiteratureSurve
     related_dir = folder / "related_papers"
     related_dir.mkdir(exist_ok=True)
     index_entries = []
-    for paper, relation, score in related_with_relations:
-        pid_safe = safe_filename(paper["id"])
-        (related_dir / f"{pid_safe}.json").write_text(
-            json.dumps(paper, indent=2, default=str), encoding="utf-8"
-        )
+    for node in nodes:
+        if node.is_focal:
+            continue
+        # Find paper data for this node
+        paper_data = next((p for p in all_papers if p.get("id") == node.id), None)
+        if paper_data:
+            pid_safe = safe_filename(node.id)
+            (related_dir / f"{pid_safe}.json").write_text(
+                json.dumps(paper_data, indent=2, default=str), encoding="utf-8"
+            )
         index_entries.append({
-            "id": paper.get("id"),
-            "title": paper.get("title"),
-            "authors": paper.get("authors"),
-            "date": paper.get("date"),
-            "url": paper.get("url"),
-            "relevance_score": score,
+            "id": node.id,
+            "title": node.title,
+            "authors": node.authors,
+            "date": node.date,
+            "url": node.url,
+            "relevance_score": node.relevance_score,
+            "hop_level": node.hop_level,
         })
     (folder / "related_papers_index.json").write_text(
         json.dumps(index_entries, indent=2, default=str), encoding="utf-8"
@@ -429,8 +500,9 @@ def _build_survey_sync(paper_id: str, all_papers: list[dict]) -> LiteratureSurve
     return LiteratureSurvey(
         focal_paper_id=focal_paper["id"],
         graph=graph,
-        survey_text=survey_text,
-        paper_count=len(related_nodes) + 1,
+        related_work_html=related_work_html,
+        related_work_source=related_work_source,
+        paper_count=len(nodes),
         status="ready",
     )
 
@@ -440,14 +512,13 @@ def _build_survey_bg(paper_id: str, all_papers: list[dict]) -> None:
     try:
         survey = _build_survey_sync(paper_id, all_papers)
         _save_survey(survey)
-        logger.info(f"Survey generated for {paper_id}")
+        logger.info(f"Related works graph generated for {paper_id}")
     except Exception as e:
-        logger.error(f"Survey generation failed for {paper_id}: {e}")
+        logger.error(f"Related works generation failed for {paper_id}: {e}")
         try:
             error_survey = LiteratureSurvey(
                 focal_paper_id=paper_id,
                 graph=LiteratureSurveyGraph(focal_paper_id=paper_id, nodes=[], edges=[]),
-                survey_text="<p>Error generating survey. Please try again.</p>",
                 status="error",
                 paper_count=0,
             )
@@ -459,16 +530,17 @@ def _build_survey_bg(paper_id: str, all_papers: list[dict]) -> None:
             _generating.discard(paper_id)
 
 
-def start_survey_generation(paper_id: str, all_papers: list[dict]) -> str:
+def start_survey_generation(paper_id: str, all_papers: list[dict], force: bool = False) -> str:
     """Kick off background survey generation. Returns current status string."""
     with _lock:
         if paper_id in _generating:
             return "generating"
 
     # Already done?
-    existing = get_survey(paper_id)
-    if existing and existing.status == "ready":
-        return "ready"
+    if not force:
+        existing = get_survey(paper_id)
+        if existing and existing.status == "ready":
+            return "ready"
 
     with _lock:
         _generating.add(paper_id)

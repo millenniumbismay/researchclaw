@@ -2,7 +2,6 @@
 // MY LIST
 // ============================================================
 function renderMyList() {
-  renderExplorationsList();
   const feed = document.getElementById('mylist-feed');
   const entries = Object.values(myListState).sort((a,b) => (b.added_at||'').localeCompare(a.added_at||''));
   if (!entries.length) {

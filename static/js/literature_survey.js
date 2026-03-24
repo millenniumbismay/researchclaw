@@ -1,5 +1,5 @@
 // ============================================================
-// LITERATURE SURVEY — D3 Knowledge Graph + Academic Survey Text
+// RELATED WORKS — Multi-hop D3 Knowledge Graph
 // ============================================================
 
 let _surveyPollTimer = null;
@@ -35,8 +35,8 @@ function renderSurveyGenerating(pid) {
     _surveyPaperHeader(p)
     + '<div class="survey-generating">'
     + '<div class="survey-spinner"></div>'
-    + '<span>Generating literature survey&hellip;</span>'
-    + '<span style="font-size:0.78rem;color:var(--muted);margin-top:-6px;">This may take 30&ndash;60 seconds</span>'
+    + '<span>Generating related works\u2026</span>'
+    + '<span style="font-size:0.78rem;color:var(--muted);margin-top:-6px;">This may take 30\u201360 seconds</span>'
     + '</div>';
 }
 
@@ -47,9 +47,9 @@ function renderSurveyEmpty(pid) {
   mid.innerHTML =
     _surveyPaperHeader(p)
     + '<div class="survey-generating">'
-    + '<span style="color:var(--muted);font-size:0.88rem;">No literature survey generated yet.</span>'
+    + '<span style="color:var(--muted);font-size:0.88rem;">No related works graph generated yet.</span>'
     + '<button class="btn-generate-survey" onclick="generateSurvey(\'' + escA(pid) + '\')">'
-    + '&#x1F52C; Generate Literature Survey</button>'
+    + '&#x1F52C; Generate Related Works</button>'
     + '</div>';
 }
 
@@ -60,7 +60,7 @@ function renderSurveyError(pid) {
   mid.innerHTML =
     _surveyPaperHeader(p)
     + '<div class="survey-generating">'
-    + '<span style="color:var(--danger);font-size:0.88rem;">Error generating survey.</span>'
+    + '<span style="color:var(--danger);font-size:0.88rem;">Error generating related works.</span>'
     + '<button class="btn-generate-survey" onclick="generateSurvey(\'' + escA(pid) + '\')">'
     + '&#x1F504; Retry</button>'
     + '</div>';
@@ -75,23 +75,47 @@ function toggleSurveySection(key) {
   if (chevron) chevron.textContent = isOpen ? '\u25b8' : '\u25be';
 }
 
-function renderSurveyDashboard(survey, pid) {
+function renderSurveyDashboard(survey, pid, stale) {
   const mid = _surveyMidEl();
   if (!mid) return;
   const p = _entryPaper(pid);
 
+  // Staleness banner
+  const staleBanner = stale
+    ? '<div class="survey-stale-banner">'
+    + '<span>New papers added to My List may affect this graph.</span>'
+    + '<button class="btn-regenerate" onclick="regenerateSurvey(\'' + escA(pid) + '\')">\uD83D\uDD04 Regenerate</button>'
+    + '</div>'
+    : '';
+
+  // Related work content
+  let relatedWorkContent = '';
+  if (survey.related_work_html && survey.related_work_source === 'arxiv_html') {
+    relatedWorkContent = '<div class="survey-text-body" id="survey-text">'
+      + '<div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;">From the original paper</div>'
+      + survey.related_work_html
+      + '</div>';
+  } else {
+    const paperUrl = p.url || '';
+    relatedWorkContent = '<div class="survey-text-body" id="survey-text">'
+      + '<p style="color:var(--muted);font-size:0.85rem;">Related work section not available for this paper.'
+      + (paperUrl ? ' <a href="' + escA(paperUrl) + '" target="_blank" style="color:var(--accent);">View full paper</a>' : '')
+      + '</p></div>';
+  }
+
   mid.innerHTML =
     _surveyPaperHeader(p) +
-    // Section A: Literature Survey (expanded)
+    staleBanner +
+    // Section A: Related Works (expanded)
     '<div class="survey-section" id="section-lit">' +
       '<div class="survey-section-header" onclick="toggleSurveySection(\'lit\')">' +
-        '<span class="survey-section-icon">\uD83D\uDCD6</span>' +
-        '<span class="survey-section-label">Literature Survey</span>' +
+        '<span class="survey-section-icon">\uD83D\uDD17</span>' +
+        '<span class="survey-section-label">Related Works</span>' +
         '<span class="survey-section-chevron" id="chevron-lit">\u25be</span>' +
       '</div>' +
       '<div class="survey-section-body" id="body-lit">' +
         '<div class="survey-graph-wrap" id="survey-graph-wrap"><div id="survey-graph"></div><div class="survey-tooltip" id="survey-tooltip"></div></div>' +
-        '<div class="survey-text-body" id="survey-text"></div>' +
+        relatedWorkContent +
       '</div>' +
     '</div>' +
     // Section B: Research Directions (collapsed)
@@ -109,33 +133,52 @@ function renderSurveyDashboard(survey, pid) {
       '</div>' +
     '</div>';
 
-  document.getElementById('survey-text').innerHTML = survey.survey_text || '<p>No survey text available.</p>';
-
   if (survey.graph && survey.graph.nodes && survey.graph.nodes.length > 0) {
-    // Small delay to ensure the container is in the DOM
     setTimeout(() => renderD3Graph(survey.graph), 50);
   }
 }
 
 // ============================================================
-// D3.js Force-Directed Graph
+// D3.js Multi-Hop Force-Directed Graph
 // ============================================================
+
+// Colors per hop level
+const HOP_COLORS = ['#7c6af7', '#5a5af7', '#3a8af7', '#3ac0f7'];
+const HOP_STROKE = ['#a89cf5', '#8080f7', '#6aacf7', '#6ad8f7'];
+const HOP_RADIUS = [18, 14, 11, 8];
+
+function _nodeRadius(d) {
+  if (d.is_focal) return HOP_RADIUS[0];
+  const hop = d.hop_level || 1;
+  const base = HOP_RADIUS[Math.min(hop, HOP_RADIUS.length - 1)];
+  return base + Math.round((d.relevance_score || 0) * 3);
+}
+
+function _nodeColor(d) {
+  if (d.is_focal) return HOP_COLORS[0];
+  const hop = d.hop_level || 1;
+  return HOP_COLORS[Math.min(hop, HOP_COLORS.length - 1)];
+}
+
+function _nodeStroke(d) {
+  if (d.is_focal) return HOP_STROKE[0];
+  const hop = d.hop_level || 1;
+  return HOP_STROKE[Math.min(hop, HOP_STROKE.length - 1)];
+}
 
 function renderD3Graph(graphData) {
   const container = document.getElementById('survey-graph');
   if (!container) return;
   if (typeof d3 === 'undefined') {
-    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:0.82rem;">D3.js not loaded — graph unavailable.</div>';
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:0.82rem;">D3.js not loaded \u2014 graph unavailable.</div>';
     return;
   }
 
-  // Clear any existing content
   container.innerHTML = '';
 
   const width = container.clientWidth || 600;
-  const height = 420;
+  const height = 520;
 
-  // SVG + zoom group
   const svg = d3.select(container)
     .append('svg')
     .attr('width', '100%')
@@ -151,19 +194,23 @@ function renderD3Graph(graphData) {
 
   const tooltip = document.getElementById('survey-tooltip');
 
-  // Deep-copy data so D3 mutation doesn't corrupt the original
+  // Deep-copy data
   const nodes = graphData.nodes.map(n => Object.assign({}, n));
   const links = graphData.edges.map(e => Object.assign({}, e));
 
-  // Force simulation
+  // Force simulation — tuned for larger multi-hop graph
   const simulation = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(links)
       .id(d => d.id)
-      .distance(130)
-      .strength(0.4))
-    .force('charge', d3.forceManyBody().strength(-280))
+      .distance(d => {
+        // Longer distance for higher hop levels
+        const sourceHop = (typeof d.source === 'object' ? d.source.hop_level : 0) || 0;
+        return 120 + sourceHop * 30;
+      })
+      .strength(0.35))
+    .force('charge', d3.forceManyBody().strength(-200))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collide', d3.forceCollide().radius(d => _nodeRadius(d) + 10));
+    .force('collide', d3.forceCollide().radius(d => _nodeRadius(d) + 8));
 
   // ---- Edges ----
   const link = g.append('g')
@@ -179,7 +226,15 @@ function renderD3Graph(graphData) {
       d3.select(this)
         .attr('stroke', 'rgba(124,106,247,0.85)')
         .attr('opacity', 1);
-      _showTooltip(tooltip, event, esc(d.relation), container, false);
+      // Rich tooltip with commonalities + differences
+      let tipHtml = '<strong>' + esc(d.relation) + '</strong>';
+      if (d.commonalities) {
+        tipHtml += '<br><span style="color:#6af7a0;">\u25CF Common:</span> ' + esc(d.commonalities);
+      }
+      if (d.differences) {
+        tipHtml += '<br><span style="color:#f7b76a;">\u25CF Different:</span> ' + esc(d.differences);
+      }
+      _showTooltip(tooltip, event, tipHtml, container, true);
     })
     .on('mousemove', function(event) {
       _moveTooltip(tooltip, event, container);
@@ -213,10 +268,12 @@ function renderD3Graph(graphData) {
     )
     .on('mouseover', function(event, d) {
       const authorsStr = (d.authors || []).slice(0, 2).join(', ');
+      const hopLabel = d.is_focal ? 'Focal paper' : 'Hop ' + (d.hop_level || 1);
       const tipHtml =
         '<strong>' + esc(d.title) + '</strong>'
         + (authorsStr ? '<br><span style="color:var(--muted);font-size:0.75rem;">' + esc(authorsStr) + '</span>' : '')
-        + (d.date ? '<br><span style="color:var(--muted);font-size:0.75rem;">' + esc(d.date) + '</span>' : '');
+        + (d.date ? '<br><span style="color:var(--muted);font-size:0.75rem;">' + esc(d.date) + '</span>' : '')
+        + '<br><span style="color:var(--muted);font-size:0.7rem;">' + hopLabel + '</span>';
       _showTooltip(tooltip, event, tipHtml, container, true);
       // Highlight connected edges, dim others
       link
@@ -237,21 +294,52 @@ function renderD3Graph(graphData) {
       if (d.url) window.open(d.url, '_blank');
     });
 
-  // Circles
+  // Circles — colored by hop level
   node.append('circle')
     .attr('r', d => _nodeRadius(d))
-    .attr('fill', d => d.is_focal ? '#7c6af7' : '#2e2e4a')
-    .attr('stroke', d => d.is_focal ? '#a89cf5' : '#5a5a80')
-    .attr('stroke-width', d => d.is_focal ? 2.5 : 1.5);
+    .attr('fill', d => _nodeColor(d))
+    .attr('stroke', d => _nodeStroke(d))
+    .attr('stroke-width', d => d.is_focal ? 2.5 : 1.5)
+    .attr('opacity', d => {
+      const hop = d.hop_level || 0;
+      return hop >= 3 ? 0.7 : 1;
+    });
 
-  // Labels (below the circle)
-  node.append('text')
+  // Labels — show for focal + hop1 only, hop2/3 appear on hover via tooltip
+  node.filter(d => d.is_focal || (d.hop_level || 1) <= 1)
+    .append('text')
     .text(d => _truncateStr(d.title, 24))
     .attr('text-anchor', 'middle')
     .attr('dy', d => _nodeRadius(d) + 13)
     .attr('fill', '#7a7a9a')
     .attr('font-size', '9px')
     .attr('pointer-events', 'none');
+
+  // ---- Legend ----
+  const legend = svg.append('g')
+    .attr('transform', 'translate(' + (width - 110) + ', 14)');
+
+  const legendItems = [
+    { label: 'Focal', color: HOP_COLORS[0], r: 7 },
+    { label: 'Hop 1', color: HOP_COLORS[1], r: 6 },
+    { label: 'Hop 2', color: HOP_COLORS[2], r: 5 },
+    { label: 'Hop 3', color: HOP_COLORS[3], r: 4 },
+  ];
+
+  legendItems.forEach((item, i) => {
+    const y = i * 18;
+    legend.append('circle')
+      .attr('cx', 0).attr('cy', y)
+      .attr('r', item.r)
+      .attr('fill', item.color)
+      .attr('stroke', '#444')
+      .attr('stroke-width', 0.5);
+    legend.append('text')
+      .attr('x', 14).attr('y', y + 4)
+      .text(item.label)
+      .attr('fill', '#7a7a9a')
+      .attr('font-size', '9px');
+  });
 
   // Tick handler
   simulation.on('tick', () => {
@@ -272,11 +360,6 @@ function renderD3Graph(graphData) {
     });
     ro.observe(container);
   }
-}
-
-function _nodeRadius(d) {
-  if (d.is_focal) return 18;
-  return 10 + Math.round((d.relevance_score || 0) * 6);
 }
 
 function _truncateStr(str, maxLen) {
@@ -321,7 +404,6 @@ function _hideTooltip(tooltip) {
 // ============================================================
 
 async function loadSurvey(pid) {
-  // Cancel any existing poll
   if (_surveyPollTimer) {
     clearInterval(_surveyPollTimer);
     _surveyPollTimer = null;
@@ -351,9 +433,23 @@ async function generateSurvey(pid) {
   }
 }
 
+async function regenerateSurvey(pid) {
+  renderSurveyGenerating(pid);
+  try {
+    const r = await fetch(
+      '/api/explorations/' + encodeURIComponent(pid) + '/survey/generate?force=true',
+      { method: 'POST' }
+    );
+    const data = await r.json();
+    _handleSurveyResponse(data, pid);
+  } catch(e) {
+    renderSurveyError(pid);
+  }
+}
+
 function _handleSurveyResponse(data, pid) {
   if (data.status === 'ready' && data.survey) {
-    renderSurveyDashboard(data.survey, pid);
+    renderSurveyDashboard(data.survey, pid, data.stale || false);
   } else if (data.status === 'generating') {
     renderSurveyGenerating(pid);
     _startSurveyPolling(pid);
@@ -373,13 +469,12 @@ function _startSurveyPolling(pid) {
       if (data.status === 'ready' && data.survey) {
         clearInterval(_surveyPollTimer);
         _surveyPollTimer = null;
-        renderSurveyDashboard(data.survey, pid);
+        renderSurveyDashboard(data.survey, pid, data.stale || false);
       } else if (data.status === 'error') {
         clearInterval(_surveyPollTimer);
         _surveyPollTimer = null;
         renderSurveyError(pid);
       }
-      // still generating — keep polling
     } catch(e) {
       // ignore transient errors
     }

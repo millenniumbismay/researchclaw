@@ -4,19 +4,18 @@
 function renderExplorationsList() {
   const pane = document.getElementById('exp-left-pane');
   if (!pane) return;
-  const entries = Object.values(myListState).sort((a,b) => (b.added_at||'').localeCompare(a.added_at||''));
-  if (!entries.length) {
-    pane.innerHTML = '<div class="empty-state" style="padding:24px 12px;font-size:0.82rem;"><p>Add papers to My List first.</p></div>';
+  if (!exploredPapers.length) {
+    pane.innerHTML = '<div class="empty-state" style="padding:24px 12px;font-size:0.82rem;"><p>Click \uD83D\uDD2D Explore on a paper in My List to begin.</p></div>';
     return;
   }
-  pane.innerHTML = entries.map(function(entry) {
-    const pid = entry.paper_id;
-    const p = entry.paper || {};
+  pane.innerHTML = exploredPapers.map(function(meta) {
+    const pid = meta.paper_id;
     const cid = cId(pid);
+    const authors = meta.authors || [];
     return '<div class="exp-paper-item" id="exp-item-' + cid + '" onclick="selectExplorationPaper(\'' + escA(pid) + '\')">'
-      + '<div class="exp-paper-title">' + esc(p.title||'Untitled') + '</div>'
-      + '<div class="exp-paper-meta">' + esc((p.authors||[])[0]||'') + (p.date?' · '+esc(p.date):'') + '</div>'
-      + '<span class="exp-paper-status">' + esc(entry.status||'To Read') + '</span>'
+      + '<div class="exp-paper-title">' + esc(meta.title||'Untitled') + '</div>'
+      + '<div class="exp-paper-meta">' + esc(authors[0]||'') + (meta.date?' \u00b7 '+esc(meta.date):'') + '</div>'
+      + '<span class="exp-paper-status">' + esc(meta.status||'To Read') + '</span>'
       + '</div>';
   }).join('');
 }

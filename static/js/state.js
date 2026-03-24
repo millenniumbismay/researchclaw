@@ -14,6 +14,7 @@ const TAG_PALETTE = [
 const chipData = {topics:[],keywords:[],authors:[],venues:[]};
 let allPapers = [];
 let myListState = {};
+let exploredPapers = [];
 let crawlHistory = [];
 let crawlChart = null;
 let pollTimer = null;

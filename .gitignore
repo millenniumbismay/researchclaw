@@ -18,5 +18,8 @@ crawl_history.json
 # Output (generated, not source)
 output/
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # OS
 .DS_Store

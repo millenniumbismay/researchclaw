@@ -244,12 +244,29 @@ async function doDashSummarize(pid) {
 // ============================================================
 // EXPLORATIONS API
 // ============================================================
+async function loadExplorations() {
+  try {
+    const r = await fetch('/api/explorations');
+    if (r.ok) {
+      exploredPapers = await r.json();
+      exploredPapers.sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
+    }
+  } catch(e) {
+    console.error('Failed to load explorations', e);
+  }
+}
+
 async function selectExplorationPaper(pid) {
+  await fetch('/api/explorations/' + encodeURIComponent(pid) + '/init', {method:'POST'});
+
+  // Refresh explored papers list and re-render left pane
+  await loadExplorations();
+  renderExplorationsList();
+
+  // Mark active
   document.querySelectorAll('.exp-paper-item').forEach(el => el.classList.remove('active'));
   const item = document.getElementById('exp-item-' + cId(pid));
   if (item) item.classList.add('active');
-
-  await fetch('/api/explorations/' + encodeURIComponent(pid) + '/init', {method:'POST'});
 
   loadSurvey(pid);
   renderRelatedPapers(pid);
