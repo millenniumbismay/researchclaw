@@ -219,12 +219,12 @@ function renderD3Graph(graphData) {
     .data(links)
     .enter()
     .append('line')
-    .attr('stroke', 'rgba(124,106,247,0.3)')
-    .attr('stroke-width', d => Math.max(1, d.strength * 3))
-    .attr('opacity', 0.6)
+    .attr('stroke', 'rgba(160,140,255,0.55)')
+    .attr('stroke-width', d => Math.max(1.5, d.strength * 4))
+    .attr('opacity', 0.85)
     .on('mouseover', function(event, d) {
       d3.select(this)
-        .attr('stroke', 'rgba(124,106,247,0.85)')
+        .attr('stroke', 'rgba(180,160,255,0.95)')
         .attr('opacity', 1);
       // Rich tooltip with commonalities + differences
       let tipHtml = '<strong>' + esc(d.relation) + '</strong>';
@@ -241,8 +241,8 @@ function renderD3Graph(graphData) {
     })
     .on('mouseout', function() {
       d3.select(this)
-        .attr('stroke', 'rgba(124,106,247,0.3)')
-        .attr('opacity', 0.6);
+        .attr('stroke', 'rgba(160,140,255,0.55)')
+        .attr('opacity', 0.85);
       _hideTooltip(tooltip);
     });
 
@@ -277,9 +277,9 @@ function renderD3Graph(graphData) {
       _showTooltip(tooltip, event, tipHtml, container, true);
       // Highlight connected edges, dim others
       link
-        .attr('opacity', l => (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.12)
+        .attr('opacity', l => (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.15)
         .attr('stroke', l => (l.source.id === d.id || l.target.id === d.id)
-          ? 'rgba(124,106,247,0.9)' : 'rgba(124,106,247,0.15)');
+          ? 'rgba(180,160,255,0.95)' : 'rgba(160,140,255,0.18)');
     })
     .on('mousemove', function(event) {
       _moveTooltip(tooltip, event, container);
@@ -287,8 +287,8 @@ function renderD3Graph(graphData) {
     .on('mouseout', function() {
       _hideTooltip(tooltip);
       link
-        .attr('opacity', 0.6)
-        .attr('stroke', 'rgba(124,106,247,0.3)');
+        .attr('opacity', 0.85)
+        .attr('stroke', 'rgba(160,140,255,0.55)');
     })
     .on('click', function(event, d) {
       if (d.url) window.open(d.url, '_blank');
