@@ -4,11 +4,22 @@ from fastapi import APIRouter
 from app.config import settings
 from app.utils import safe_filename
 from app.models.literature_survey import SurveyStatusResponse
+from app.models.research_directions import (
+    ChatRequest,
+    ChatResponse,
+    ResearchDirectionsStatus,
+)
 from app.services.literature_survey_service import (
     check_survey_staleness,
     get_survey,
     get_survey_status,
     start_survey_generation,
+)
+from app.services.research_directions_service import (
+    chat_with_analysis,
+    get_analysis,
+    get_status as get_directions_status,
+    start_analysis,
 )
 from app.services.paper_service import get_all_papers
 
@@ -87,3 +98,26 @@ async def generate_survey_route(paper_id: str, force: bool = False):
     status = start_survey_generation(paper_id, all_papers, force=force)
     survey = get_survey(paper_id) if status == "ready" else None
     return SurveyStatusResponse(paper_id=paper_id, status=status, survey=survey)
+
+
+# ============================================================
+# Research Directions
+# ============================================================
+
+@router.get("/api/explorations/{paper_id}/directions", response_model=ResearchDirectionsStatus)
+async def get_directions_route(paper_id: str):
+    status = get_directions_status(paper_id)
+    analysis = get_analysis(paper_id) if status == "ready" else None
+    return ResearchDirectionsStatus(paper_id=paper_id, status=status, analysis=analysis)
+
+
+@router.post("/api/explorations/{paper_id}/directions/generate", response_model=ResearchDirectionsStatus)
+async def generate_directions_route(paper_id: str):
+    status = start_analysis(paper_id)
+    analysis = get_analysis(paper_id) if status == "ready" else None
+    return ResearchDirectionsStatus(paper_id=paper_id, status=status, analysis=analysis)
+
+
+@router.post("/api/explorations/{paper_id}/directions/chat", response_model=ChatResponse)
+async def chat_directions_route(paper_id: str, body: ChatRequest):
+    return chat_with_analysis(paper_id, body.message)

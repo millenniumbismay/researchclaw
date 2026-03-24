@@ -270,4 +270,8 @@ async function selectExplorationPaper(pid) {
 
   loadSurvey(pid);
   renderRelatedPapers(pid);
+
+  // Set current paper for research directions and reset loaded state
+  if (typeof _directionsCurrentPid !== 'undefined') _directionsCurrentPid = pid;
+  if (typeof _directionsLoaded !== 'undefined') _directionsLoaded[pid] = false;
 }

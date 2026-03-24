@@ -73,6 +73,22 @@ function toggleSurveySection(key) {
   const isOpen = body.style.display !== 'none';
   body.style.display = isOpen ? 'none' : 'block';
   if (chevron) chevron.textContent = isOpen ? '\u25b8' : '\u25be';
+
+  // Load research directions on first open
+  if (key === 'research' && !isOpen && typeof loadResearchDirections === 'function') {
+    var pid = _directionsCurrentPid;
+    // Fallback: find active exploration paper
+    if (!pid) {
+      var activeItem = document.querySelector('.exp-paper-item.active');
+      if (activeItem) {
+        var idAttr = activeItem.id || '';
+        // exp-item-{cId} — not directly the pid, so use _directionsCurrentPid if set
+      }
+    }
+    if (pid && (!_directionsLoaded || !_directionsLoaded[pid])) {
+      loadResearchDirections(pid);
+    }
+  }
 }
 
 function renderSurveyDashboard(survey, pid, stale) {
@@ -126,10 +142,7 @@ function renderSurveyDashboard(survey, pid, stale) {
         '<span class="survey-section-chevron" id="chevron-research">\u25b8</span>' +
       '</div>' +
       '<div class="survey-section-body" id="body-research" style="display:none;">' +
-        '<div class="survey-directions-placeholder">' +
-          '<p>Research directions will be generated here \u2014 open questions, gaps in the literature, and suggested next steps based on the survey.</p>' +
-          '<button class="btn-generate-survey" style="opacity:0.5;cursor:not-allowed;" disabled>\uD83D\uDD2D Coming Soon</button>' +
-        '</div>' +
+        '<div class="rd-empty"><p>Loading\u2026</p></div>' +
       '</div>' +
     '</div>';
 
