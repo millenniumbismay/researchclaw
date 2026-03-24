@@ -143,8 +143,8 @@ function renderSurveyDashboard(survey, pid, stale) {
 // ============================================================
 
 // Colors per hop level
-const HOP_COLORS = ['#7c6af7', '#5a5af7', '#3a8af7', '#3ac0f7'];
-const HOP_STROKE = ['#a89cf5', '#8080f7', '#6aacf7', '#6ad8f7'];
+const HOP_COLORS = ['#9370DB', '#5a5af7', '#3a8af7', '#3ac0f7'];
+const HOP_STROKE = ['#b896e8', '#8080f7', '#6aacf7', '#6ad8f7'];
 const HOP_RADIUS = [18, 14, 11, 8];
 
 function _nodeRadius(d) {

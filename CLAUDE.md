@@ -1,14 +1,10 @@
-# ResearchClaw
-
-AI-powered research paper curator. Crawls arXiv, Semantic Scholar, and HuggingFace Daily Papers, then uses Claude to classify and summarize relevant papers. FastAPI web UI with D3 knowledge graphs.
+## Goal
+ResearchClaw is an end-to-end research assistant starting from research paper crawling to autoresearch. An academic researcher is our target user. The workflow looks broadly like: A researcher provides a research topic or domain of research they are interested in -> ResearchClaw crawls related papers everyday and present them with confidence and tags -> Researcher add few of those papers to their list (My List) -> They further explores a paper which is closely aligned with their research interests -> ResearchClaw help in Literature Survey, finds related papers and discusses with the Researcher in identifying gaps in current research and creating and refining research directions -> Once a few research directions are identified, a basic implementation of the code and experiments are done completely autonomously by ResearchClaw and will be further iterated with the researcher -> Finally researcher and ResearchClaw iteratively perform autoresearch in multiple direction with an aim to close the gaps and explore experiments to consolidate the research directions.
 
 ## Quick Start
 
 ```bash
-conda activate ar
-pip install -r requirements.txt
-# Create .env with ANTHROPIC_API_KEY (required), TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-# Edit preferences.yaml for research interests
+conda activate ar # Activate conda env
 ./run.sh          # one-shot crawl + summarize
 ./start_ui.sh     # web UI at http://localhost:7337
 ```
@@ -46,6 +42,11 @@ pip install -r requirements.txt
 - `ANTHROPIC_API_KEY` — required for Claude API
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — for notification delivery
 - `TWITTER_BEARER_TOKEN` — optional, for Twitter/X paper source
+
+## Git Rules
+
+- Never add co-author tag in Commit messages
+
 
 ## Important Notes
 
