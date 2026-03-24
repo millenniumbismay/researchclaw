@@ -403,6 +403,29 @@ def _build_survey_sync(paper_id: str, all_papers: list[dict]) -> LiteratureSurve
         edges=edges,
     )
 
+    # Save related papers to exploration folder
+    folder = settings.explorations_dir / safe_filename(focal_paper["id"])
+    folder.mkdir(parents=True, exist_ok=True)
+    related_dir = folder / "related_papers"
+    related_dir.mkdir(exist_ok=True)
+    index_entries = []
+    for paper, relation, score in related_with_relations:
+        pid_safe = safe_filename(paper["id"])
+        (related_dir / f"{pid_safe}.json").write_text(
+            json.dumps(paper, indent=2, default=str), encoding="utf-8"
+        )
+        index_entries.append({
+            "id": paper.get("id"),
+            "title": paper.get("title"),
+            "authors": paper.get("authors"),
+            "date": paper.get("date"),
+            "url": paper.get("url"),
+            "relevance_score": score,
+        })
+    (folder / "related_papers_index.json").write_text(
+        json.dumps(index_entries, indent=2, default=str), encoding="utf-8"
+    )
+
     return LiteratureSurvey(
         focal_paper_id=focal_paper["id"],
         graph=graph,

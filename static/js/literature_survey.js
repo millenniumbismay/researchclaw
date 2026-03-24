@@ -66,27 +66,50 @@ function renderSurveyError(pid) {
     + '</div>';
 }
 
-function renderSurveyDashboard(survey) {
+function toggleSurveySection(key) {
+  const body = document.getElementById('body-' + key);
+  const chevron = document.getElementById('chevron-' + key);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chevron) chevron.textContent = isOpen ? '\u25b8' : '\u25be';
+}
+
+function renderSurveyDashboard(survey, pid) {
   const mid = _surveyMidEl();
   if (!mid) return;
-
-  const pid = survey.focal_paper_id;
   const p = _entryPaper(pid);
 
   mid.innerHTML =
-    _surveyPaperHeader(p)
-    + '<div class="survey-section-title">Knowledge Graph</div>'
-    + '<div class="survey-graph-wrap">'
-    + '<div id="survey-graph" style="width:100%;height:420px;position:relative;"></div>'
-    + '<div class="survey-tooltip" id="survey-tooltip"></div>'
-    + '</div>'
-    + '<div class="survey-section-title" style="margin-top:24px;">Literature Survey</div>'
-    + '<div class="survey-text-body" id="survey-text"></div>';
+    _surveyPaperHeader(p) +
+    // Section A: Literature Survey (expanded)
+    '<div class="survey-section" id="section-lit">' +
+      '<div class="survey-section-header" onclick="toggleSurveySection(\'lit\')">' +
+        '<span class="survey-section-icon">\uD83D\uDCD6</span>' +
+        '<span class="survey-section-label">Literature Survey</span>' +
+        '<span class="survey-section-chevron" id="chevron-lit">\u25be</span>' +
+      '</div>' +
+      '<div class="survey-section-body" id="body-lit">' +
+        '<div class="survey-graph-wrap" id="survey-graph-wrap"><div id="survey-graph"></div><div class="survey-tooltip" id="survey-tooltip"></div></div>' +
+        '<div class="survey-text-body" id="survey-text"></div>' +
+      '</div>' +
+    '</div>' +
+    // Section B: Research Directions (collapsed)
+    '<div class="survey-section" id="section-research">' +
+      '<div class="survey-section-header" onclick="toggleSurveySection(\'research\')">' +
+        '<span class="survey-section-icon">\uD83D\uDD2D</span>' +
+        '<span class="survey-section-label">Research Directions</span>' +
+        '<span class="survey-section-chevron" id="chevron-research">\u25b8</span>' +
+      '</div>' +
+      '<div class="survey-section-body" id="body-research" style="display:none;">' +
+        '<div class="survey-directions-placeholder">' +
+          '<p>Research directions will be generated here \u2014 open questions, gaps in the literature, and suggested next steps based on the survey.</p>' +
+          '<button class="btn-generate-survey" style="opacity:0.5;cursor:not-allowed;" disabled>\uD83D\uDD2D Coming Soon</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
 
-  const surveyTextEl = document.getElementById('survey-text');
-  if (surveyTextEl) {
-    surveyTextEl.innerHTML = survey.survey_text || '<p>No survey text available.</p>';
-  }
+  document.getElementById('survey-text').innerHTML = survey.survey_text || '<p>No survey text available.</p>';
 
   if (survey.graph && survey.graph.nodes && survey.graph.nodes.length > 0) {
     // Small delay to ensure the container is in the DOM
@@ -330,7 +353,7 @@ async function generateSurvey(pid) {
 
 function _handleSurveyResponse(data, pid) {
   if (data.status === 'ready' && data.survey) {
-    renderSurveyDashboard(data.survey);
+    renderSurveyDashboard(data.survey, pid);
   } else if (data.status === 'generating') {
     renderSurveyGenerating(pid);
     _startSurveyPolling(pid);
@@ -350,7 +373,7 @@ function _startSurveyPolling(pid) {
       if (data.status === 'ready' && data.survey) {
         clearInterval(_surveyPollTimer);
         _surveyPollTimer = null;
-        renderSurveyDashboard(data.survey);
+        renderSurveyDashboard(data.survey, pid);
       } else if (data.status === 'error') {
         clearInterval(_surveyPollTimer);
         _surveyPollTimer = null;
