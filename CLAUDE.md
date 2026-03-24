@@ -46,7 +46,7 @@ conda activate ar # Activate conda env
 ## Git Rules
 
 - Never add co-author tag in Commit messages
-
+- Commit messages should be clean, concise and informative about the works completed since the last commit
 
 ## Important Notes
 
