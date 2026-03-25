@@ -3,6 +3,10 @@
 // ============================================================
 
 let _surveyPollTimer = null;
+let _currentGraphData = null;  // full 3-hop graph for client-side filtering
+let _hopSliderHandler = null;
+let _d3Simulation = null;
+let _resizeObserver = null;
 
 // ============================================================
 // State Rendering Helpers
@@ -114,6 +118,11 @@ function renderSurveyDashboard(survey, pid, stale) {
         '<span class="survey-section-chevron" id="chevron-lit">\u25be</span>' +
       '</div>' +
       '<div class="survey-section-body" id="body-lit">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:0.8rem;color:var(--muted);">' +
+          '<label for="hop-slider" style="white-space:nowrap;">Depth:</label>' +
+          '<input type="range" id="hop-slider" min="1" max="3" value="3" step="1" style="width:100px;accent-color:#9370DB;cursor:pointer;">' +
+          '<span id="hop-slider-value" style="min-width:18px;text-align:center;font-weight:600;color:var(--text);">3</span>' +
+        '</div>' +
         '<div class="survey-graph-wrap" id="survey-graph-wrap"><div id="survey-graph"></div><div class="survey-tooltip" id="survey-tooltip"></div></div>' +
         relatedWorkContent +
       '</div>' +
@@ -134,7 +143,23 @@ function renderSurveyDashboard(survey, pid, stale) {
     '</div>';
 
   if (survey.graph && survey.graph.nodes && survey.graph.nodes.length > 0) {
-    setTimeout(() => renderD3Graph(survey.graph), 50);
+    _currentGraphData = survey.graph;
+    setTimeout(() => {
+      renderD3Graph(_filterGraphByHop(_currentGraphData, 3));
+      const slider = document.getElementById('hop-slider');
+      if (slider) {
+        if (_hopSliderHandler) slider.removeEventListener('input', _hopSliderHandler);
+        _hopSliderHandler = function() {
+          const val = parseInt(this.value, 10);
+          const label = document.getElementById('hop-slider-value');
+          if (label) label.textContent = val;
+          if (_currentGraphData) {
+            renderD3Graph(_filterGraphByHop(_currentGraphData, val));
+          }
+        };
+        slider.addEventListener('input', _hopSliderHandler);
+      }
+    }, 50);
   }
 }
 
@@ -166,6 +191,13 @@ function _nodeStroke(d) {
   return HOP_STROKE[Math.min(hop, HOP_STROKE.length - 1)];
 }
 
+function _filterGraphByHop(graphData, maxHop) {
+  const nodes = graphData.nodes.filter(n => n.is_focal || (n.hop_level || 1) <= maxHop);
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const edges = graphData.edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target));
+  return { ...graphData, nodes, edges };
+}
+
 function renderD3Graph(graphData) {
   const container = document.getElementById('survey-graph');
   if (!container) return;
@@ -173,6 +205,10 @@ function renderD3Graph(graphData) {
     container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:0.82rem;">D3.js not loaded \u2014 graph unavailable.</div>';
     return;
   }
+
+  // Clean up previous simulation and observer
+  if (_d3Simulation) { _d3Simulation.stop(); _d3Simulation = null; }
+  if (_resizeObserver) { _resizeObserver.disconnect(); _resizeObserver = null; }
 
   container.innerHTML = '';
 
@@ -199,7 +235,8 @@ function renderD3Graph(graphData) {
   const links = graphData.edges.map(e => Object.assign({}, e));
 
   // Force simulation — tuned for larger multi-hop graph
-  const simulation = d3.forceSimulation(nodes)
+  _d3Simulation = d3.forceSimulation(nodes)
+  const simulation = _d3Simulation
     .force('link', d3.forceLink(links)
       .id(d => d.id)
       .distance(d => {
@@ -319,12 +356,14 @@ function renderD3Graph(graphData) {
   const legend = svg.append('g')
     .attr('transform', 'translate(' + (width - 110) + ', 14)');
 
-  const legendItems = [
-    { label: 'Focal', color: HOP_COLORS[0], r: 7 },
-    { label: 'Hop 1', color: HOP_COLORS[1], r: 6 },
-    { label: 'Hop 2', color: HOP_COLORS[2], r: 5 },
-    { label: 'Hop 3', color: HOP_COLORS[3], r: 4 },
+  const presentHops = new Set(nodes.map(n => n.hop_level || 0));
+  const allLegendItems = [
+    { label: 'Focal', color: HOP_COLORS[0], r: 7, hop: 0 },
+    { label: 'Hop 1', color: HOP_COLORS[1], r: 6, hop: 1 },
+    { label: 'Hop 2', color: HOP_COLORS[2], r: 5, hop: 2 },
+    { label: 'Hop 3', color: HOP_COLORS[3], r: 4, hop: 3 },
   ];
+  const legendItems = allLegendItems.filter(item => presentHops.has(item.hop));
 
   legendItems.forEach((item, i) => {
     const y = i * 18;
@@ -353,12 +392,12 @@ function renderD3Graph(graphData) {
 
   // Resize observer
   if (typeof ResizeObserver !== 'undefined') {
-    const ro = new ResizeObserver(() => {
+    _resizeObserver = new ResizeObserver(() => {
       const newW = container.clientWidth || 600;
       simulation.force('center', d3.forceCenter(newW / 2, height / 2));
       simulation.alpha(0.1).restart();
     });
-    ro.observe(container);
+    _resizeObserver.observe(container);
   }
 }
 
