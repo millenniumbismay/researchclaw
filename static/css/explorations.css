@@ -201,3 +201,70 @@
   transition: background 0.15s;
 }
 .btn-regenerate:hover { background: rgba(247,183,106,0.25); }
+
+/* ---- Research Directions ---- */
+.rd-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 0.86rem; line-height: 1.7; }
+.rd-empty p { margin-bottom: 16px; }
+.rd-note { font-size: 0.76rem; color: var(--muted); opacity: 0.7; margin-top: 10px; }
+
+.rd-progress { display: flex; flex-direction: column; gap: 10px; padding: 30px 20px; }
+.rd-progress-step { display: flex; align-items: center; gap: 10px; font-size: 0.84rem; color: var(--muted); }
+.rd-progress-step.active { color: var(--accent); }
+.rd-progress-step.done { color: var(--success); }
+.rd-step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+.rd-progress-step.active .rd-step-dot { background: var(--accent); animation: pulse 1s infinite; }
+.rd-progress-step.done .rd-step-dot { background: var(--success); }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.rd-section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.rd-section-title:first-child { margin-top: 0; }
+
+/* Core decomposition */
+.rd-core-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+.rd-core-field { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; }
+.rd-core-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 4px; }
+.rd-core-value { font-size: 0.82rem; color: var(--text); line-height: 1.55; }
+
+/* Critical lenses */
+.rd-lenses-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+.rd-lens-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.rd-lens-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.rd-severity-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.rd-severity-info { background: #5a9af7; }
+.rd-severity-caution { background: #f7c35a; }
+.rd-severity-concern { background: #f75a5a; }
+.rd-lens-dimension { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.rd-lens-title { font-size: 0.84rem; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.rd-lens-insight { font-size: 0.8rem; color: #adb0cc; line-height: 1.6; }
+
+/* Research directions */
+.rd-directions-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.rd-direction-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; display: flex; gap: 12px; }
+.rd-dir-num { width: 26px; height: 26px; border-radius: 50%; background: rgba(124,106,247,0.15); color: var(--accent); font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.rd-dir-body { flex: 1; }
+.rd-dir-title { font-size: 0.88rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.rd-dir-desc { font-size: 0.81rem; color: #adb0cc; line-height: 1.6; margin-bottom: 6px; }
+.rd-dir-why { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+.rd-dir-why strong { color: var(--accent); font-weight: 600; }
+.rd-dir-footer { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.rd-difficulty { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: var(--chip-radius); }
+.rd-difficulty-low { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.25); }
+.rd-difficulty-medium { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+.rd-difficulty-high { background: rgba(247,106,106,0.1); color: #f76a6a; border: 1px solid rgba(247,106,106,0.25); }
+.rd-tag { font-size: 0.7rem; padding: 2px 8px; border-radius: var(--chip-radius); background: rgba(124,106,247,0.1); color: var(--accent); border: 1px solid rgba(124,106,247,0.22); }
+
+/* Chat interface */
+.rd-chat { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+.rd-chat-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 12px; }
+.rd-chat-history { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.rd-chat-msg { max-width: 88%; padding: 9px 13px; border-radius: 10px; font-size: 0.82rem; line-height: 1.6; }
+.rd-chat-msg.user { align-self: flex-end; background: rgba(124,106,247,0.18); color: var(--text); border: 1px solid rgba(124,106,247,0.28); }
+.rd-chat-msg.assistant { align-self: flex-start; background: var(--card); color: #adb0cc; border: 1px solid var(--border); }
+.rd-chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+.rd-chat-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.84rem; padding: 9px 12px; resize: none; min-height: 42px; max-height: 120px; outline: none; font-family: var(--font); line-height: 1.5; transition: border-color 0.15s; }
+.rd-chat-input:focus { border-color: var(--accent); }
+.rd-chat-input::placeholder { color: var(--muted); }
+.rd-chat-send { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 0.84rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
+.rd-chat-send:hover { background: var(--accent-dim, #6a58e0); }
+.rd-chat-send:disabled { opacity: 0.5; cursor: wait; }
