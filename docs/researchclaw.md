@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Branch:** `main`
-- **Last updated:** 2026-03-24
+- **Branch:** `frontend_redesign_2026-04-08` (pending merge to `main`)
+- **Last updated:** 2026-04-08
 - **Stack:** FastAPI + Pydantic (backend), Vanilla JS + D3.js + Chart.js (frontend)
 - **Test suite:** None yet
 - **Deployment:** Local only (`localhost:7337`)
@@ -24,7 +24,9 @@
 | Original Related Works (arXiv HTML) | Done | `app/services/paper_content_service.py` |
 | Paper content fetch + cache on My List add | Done | `app/services/paper_content_service.py`, `app/routes/feedback.py` |
 | Graph staleness detection + regenerate | Done | `app/services/literature_survey_service.py` |
-| Research Directions | Scaffold only | middle pane section exists, no AI logic yet |
+| Frontend redesign (dark/light/system themes) | Done | `static/js/theme.js`, all CSS files, `templates/index.html` |
+| Sidebar navigation | Done | `templates/index.html`, `static/css/base.css`, `static/js/app.js` |
+| Research Directions | Done | `static/js/research_directions.js`, `app/routes/explorations.py` |
 | Autonomous experiments / autoresearch | Not started | — |
 
 ## Architecture Decisions
@@ -42,6 +44,29 @@
 ## Session Log
 
 <!-- Add new sessions at the top. Keep entries concise. -->
+
+### 2026-04-08 — Frontend Redesign
+
+**Branch:** `frontend_redesign_2026-04-08`
+
+**What was done:**
+- Complete CSS-first frontend redesign: purple/lilac/blue/black color scheme
+- Dark + Light + System theme toggle with localStorage persistence (`theme.js`)
+- Sidebar navigation replacing horizontal tab bar, collapsible on mobile
+- 3-state paper cards: flat default → subtle border on hover → full accent on expand
+- All 7 CSS files rewritten with CSS custom properties for theming
+- Chart colors changed to distinct amber/purple/emerald for readability
+- Assistant tab with dedicated chat UI and prompt tiles
+- Backward-compat `--muted` alias kept for JS inline styles
+
+**Key files created/modified:**
+- NEW: `static/js/theme.js`, `static/css/assistant.css`, `static/js/assistant.js`
+- Modified: `templates/index.html` (sidebar nav restructure)
+- Modified: `static/js/app.js` (sidebar-aware tab switching)
+- Modified: `static/js/dashboard.js` (card expand classes, chart colors)
+- Rewritten: `base.css`, `components.css`, `dashboard.css`, `mylist.css`, `explorations.css`, `settings.css`, `assistant.css`
+
+---
 
 ### 2026-03-24 — Knowledge Graph Improvements
 
