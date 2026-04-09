@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderExplorationsList();
   initChart();
   checkStatus();
+  initAssistant();
 });
 
 // ============================================================
@@ -25,7 +26,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ============================================================
 function switchTab(name) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
-  document.querySelector('[data-tab="' + name + '"]').classList.add('active');
+  const btn = document.querySelector('.sidebar-btn[data-tab="' + name + '"]');
+  if (btn) btn.classList.add('active');
+  // Close mobile sidebar on tab switch
+  document.getElementById('app-layout').classList.remove('sidebar-open');
+}
+
+function toggleSidebar() {
+  document.getElementById('app-layout').classList.toggle('sidebar-open');
 }
