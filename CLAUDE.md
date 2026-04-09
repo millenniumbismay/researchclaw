@@ -81,7 +81,7 @@ conda activate ar # Activate conda env
 - Update the `/Users/mbismay/.claude/projects/-Users-mbismay-Projects-researchclaw/memory/MEMORY.md` with relevant meta information
 
 ## Git Rules
-
+- When working on a new feature, create branch in the format `<feature_name>_<date>`. If working on an already existing feature, provide the name of the most recent branch that you should work on or check for a new name of the branch from the user. `_<date>` should always be there
 - Never add co-author tag in Commit messages
 - Commit messages should be clean, concise and informative about the works completed since the last commit
 
