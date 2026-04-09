@@ -108,8 +108,8 @@ class AutoResearchProject(BaseModel):
     phase: str = "paper_selection"  # paper_selection | context_gathering | planning_chat | plan_finalized | dev_cycle | complete
     current_iteration: int = 0
     max_iterations: int = 5
-    container_id: Optional[str] = None
-    volume_name: Optional[str] = None
+    repo_path: Optional[str] = None  # Absolute path to the project git repo
+    claude_code_session_id: Optional[str] = None  # For resuming Claude Code sessions
     created_at: str = Field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
 
@@ -156,3 +156,15 @@ class ProjectStatusResponse(BaseModel):
     needs_input: bool = False
     needs_input_type: Optional[str] = None
     state: AutoResearchState
+
+
+class UserDecisionRequest(BaseModel):
+    decision: str  # approve | revise | guide
+    guidance: str = ""  # User instructions for next iteration (when decision=guide)
+
+
+class AgentStreamEvent(BaseModel):
+    event_type: str  # message | tool_use | tool_result | complete | error
+    content: str
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
+    metadata: dict = Field(default_factory=dict)
