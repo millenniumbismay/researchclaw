@@ -12,18 +12,53 @@
 <link rel="stylesheet" href="/static/css/mylist.css"/>
 <link rel="stylesheet" href="/static/css/explorations.css"/>
 <link rel="stylesheet" href="/static/css/settings.css"/>
+<link rel="stylesheet" href="/static/css/assistant.css"/>
 </head>
 <body>
 
-<header>
-  <h1>🔬 ResearchClaw</h1>
-  <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
-    <button class="tab-btn" data-tab="mylist" onclick="switchTab('mylist')">📚 My List</button>
-    <button class="tab-btn" data-tab="explorations" onclick="switchTab('explorations')">🔭 Explorations</button>
-    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
-  </nav>
-</header>
+<div class="app-layout" id="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🔬</div>
+      <span class="sidebar-logo-text">ResearchClaw</span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="sidebar-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
+        <span class="sidebar-btn-icon">📊</span>
+        <span class="sidebar-btn-label">Dashboard</span>
+      </button>
+      <button class="sidebar-btn" data-tab="mylist" onclick="switchTab('mylist')">
+        <span class="sidebar-btn-icon">📚</span>
+        <span class="sidebar-btn-label">My List</span>
+      </button>
+      <button class="sidebar-btn" data-tab="explorations" onclick="switchTab('explorations')">
+        <span class="sidebar-btn-icon">🔭</span>
+        <span class="sidebar-btn-label">Explorations</span>
+      </button>
+      <button class="sidebar-btn" data-tab="assistant" onclick="switchTab('assistant')">
+        <span class="sidebar-btn-icon">🧠</span>
+        <span class="sidebar-btn-label">Assistant</span>
+      </button>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="sidebar-btn" data-tab="settings" onclick="switchTab('settings')">
+        <span class="sidebar-btn-icon">⚙️</span>
+        <span class="sidebar-btn-label">Settings</span>
+      </button>
+      <div class="theme-toggle">
+        <button class="theme-seg" data-mode="dark" onclick="setTheme('dark')" title="Dark">🌙</button>
+        <button class="theme-seg" data-mode="light" onclick="setTheme('light')" title="Light">☀️</button>
+        <button class="theme-seg" data-mode="system" onclick="setTheme('system')" title="System">💻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar collapse toggle (mobile) -->
+  <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+
+  <!-- Main content wrapper -->
+  <main class="app-main" id="app-main">
 
 <!-- DASHBOARD -->
 <div id="tab-dashboard" class="tab-pane active">
@@ -163,8 +198,52 @@
   </div>
 </div>
 
+<!-- ASSISTANT -->
+<div id="tab-assistant" class="tab-pane">
+  <div class="assistant-layout" id="assistant-layout">
+    <!-- Sidebar -->
+    <div class="asst-sidebar" id="asst-sidebar">
+      <div class="asst-sidebar-header">
+        <button class="asst-sidebar-new-btn" onclick="newAssistantChat()">+ New Chat</button>
+        <button class="asst-sidebar-toggle" id="asst-sidebar-toggle-btn" onclick="toggleAssistantSidebar()" title="Collapse sidebar">&#9664;</button>
+      </div>
+      <div class="asst-sidebar-list" id="asst-sidebar-list"></div>
+    </div>
+    <!-- Main -->
+    <div class="asst-main" id="asst-main">
+      <div class="asst-main-header" id="asst-main-header">
+        <button class="asst-expand-toggle" id="asst-expand-toggle" onclick="toggleAssistantSidebar()" title="Show sidebar" style="display:none;">&#9776;</button>
+        <div class="asst-header-actions">
+          <button class="asst-header-btn" id="asst-incognito-btn" onclick="showToast('Incognito mode coming soon')" title="Incognito mode">🕶️</button>
+          <button class="asst-header-btn" id="asst-memory-btn" onclick="showToast('Memory coming soon')" title="Memory">🧠</button>
+        </div>
+      </div>
+      <div class="asst-landing" id="asst-landing">
+        <div class="asst-landing-icon">🔬</div>
+        <h2 class="asst-landing-title">Research Assistant</h2>
+        <p class="asst-landing-subtitle">Explore ideas, find gaps, and deepen your understanding of the literature through conversation</p>
+        <div class="asst-landing-prompts" id="asst-landing-prompts"></div>
+      </div>
+      <div class="asst-messages" id="asst-messages" style="display:none;"></div>
+      <div class="asst-input-area">
+        <div class="asst-input-row">
+          <textarea class="asst-input" id="asst-input" placeholder="Ask anything about your research..." rows="1"
+            oninput="_asstAutoResize(this)"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();handleAssistantSend();}"></textarea>
+          <button class="asst-send-btn" id="asst-send-btn" onclick="handleAssistantSend()">Send</button>
+        </div>
+        <div class="asst-input-hint">Press Enter to send, Shift+Enter for new line</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  </main>
+</div><!-- .app-layout -->
+
 <div id="toast"></div>
 
+<script src="/static/js/theme.js"></script>
 <script src="/static/js/utils.js"></script>
 <script src="/static/js/state.js"></script>
 <script src="/static/js/api.js"></script>
@@ -174,6 +253,7 @@
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/literature_survey.js?v=2"></script>
 <script src="/static/js/research_directions.js"></script>
+<script src="/static/js/assistant.js"></script>
 <script src="/static/js/app.js"></script>
 </body>
 </html>
