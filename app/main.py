@@ -22,6 +22,7 @@ def create_app() -> FastAPI:
     settings.summaries_dir.mkdir(parents=True, exist_ok=True)
     settings.explorations_dir.mkdir(parents=True, exist_ok=True)
     settings.autoresearch_dir.mkdir(parents=True, exist_ok=True)
+    settings.autoresearch_repos_dir.mkdir(parents=True, exist_ok=True)
 
     # Static files
     app.mount("/static", StaticFiles(directory=str(settings.base_dir / "static")), name="static")
