@@ -141,18 +141,25 @@ function paperCardHtml(p) {
 function toggleSummary(pid) {
   const el = document.getElementById('ps-' + cId(pid));
   const hint = document.getElementById('eh-' + cId(pid));
+  const card = document.getElementById('pc-' + cId(pid));
   if (!el) return;
   const open = el.classList.toggle('open');
   open ? expandedCards.add(pid) : expandedCards.delete(pid);
-  if (hint) hint.textContent = open ? '▲' : '▼';
+  if (hint) hint.textContent = open ? '▲ Abstract' : '▼ Abstract';
+  if (card) card.classList.toggle('expanded', open);
 }
 
 function toggleDashSummary(pid) {
   const panel = document.getElementById('dsp-' + cId(pid));
   const btn = document.getElementById('dsb-' + cId(pid));
+  const card = document.getElementById('pc-' + cId(pid));
   if (!panel) return;
   const open = panel.classList.toggle('open');
   if (btn) btn.textContent = open ? '📄 Hide Summary' : '📄 Show Summary';
+  if (card) {
+    const abstractOpen = expandedCards.has(pid);
+    card.classList.toggle('expanded', open || abstractOpen);
+  }
 }
 
 // ============================================================
@@ -189,17 +196,17 @@ function initChart() {
     data: {
       labels,
       datasets: [
-        { label: 'Conf 3', data: crawlHistory.map(e => e.conf3||0), backgroundColor: 'rgba(247,224,106,0.55)', borderColor: 'rgba(247,224,106,0.8)', borderWidth: 1, stack: 's' },
-        { label: 'Conf 4', data: crawlHistory.map(e => e.conf4||0), backgroundColor: 'rgba(247,183,106,0.55)', borderColor: 'rgba(247,183,106,0.8)', borderWidth: 1, stack: 's' },
-        { label: 'Conf 5', data: crawlHistory.map(e => e.conf5||0), backgroundColor: 'rgba(106,247,160,0.55)', borderColor: 'rgba(106,247,160,0.8)', borderWidth: 1, stack: 's' },
+        { label: 'Conf 3', data: crawlHistory.map(e => e.conf3||0), backgroundColor: 'rgba(99,102,241,0.5)', borderColor: 'rgba(99,102,241,0.8)', borderWidth: 1, stack: 's' },
+        { label: 'Conf 4', data: crawlHistory.map(e => e.conf4||0), backgroundColor: 'rgba(124,92,245,0.55)', borderColor: 'rgba(124,92,245,0.8)', borderWidth: 1, stack: 's' },
+        { label: 'Conf 5', data: crawlHistory.map(e => e.conf5||0), backgroundColor: 'rgba(59,130,246,0.55)', borderColor: 'rgba(59,130,246,0.8)', borderWidth: 1, stack: 's' },
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: true,
       plugins: { legend: { display: true, labels: { color: '#6b7080', font: { size: 11 } } }, tooltip: { callbacks: { title: items => items[0].label } } },
       scales: {
-        x: { stacked: true, ticks: { color: '#6b7080', font: { size: 10 }, maxRotation: 45, maxTicksLimit: 15 }, grid: { color: 'rgba(42,45,62,0.5)' } },
-        y: { stacked: true, ticks: { color: '#6b7080', font: { size: 10 }, stepSize: 1, precision: 0 }, grid: { color: 'rgba(42,45,62,0.5)' } }
+        x: { stacked: true, ticks: { color: '#6b7080', font: { size: 10 }, maxRotation: 45, maxTicksLimit: 15 }, grid: { color: 'rgba(26,26,53,0.5)' } },
+        y: { stacked: true, ticks: { color: '#6b7080', font: { size: 10 }, stepSize: 1, precision: 0 }, grid: { color: 'rgba(26,26,53,0.5)' } }
       }
     }
   });
