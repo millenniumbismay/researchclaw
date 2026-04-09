@@ -1,8 +1,11 @@
-"""AutoResearch routes — project management and context pipeline."""
+"""AutoResearch routes — project management, context pipeline, and agent loop."""
 
+import asyncio
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.models.autoresearch import (
     AddGithubRepoRequest,
@@ -10,9 +13,11 @@ from app.models.autoresearch import (
     CreateProjectRequest,
     FetchPaperRequest,
     ProjectStatusResponse,
+    UserDecisionRequest,
 )
 from app.services import autoresearch_project_service as project_svc
 from app.services import autoresearch_context_service as context_svc
+from app.services import autoresearch_orchestrator as orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -134,3 +139,140 @@ async def get_context(project_id: str):
         "paper_contexts": [pc.model_dump() for pc in state.paper_contexts],
         "phase": state.project.phase,
     }
+
+
+# ============================================================
+# Planning
+# ============================================================
+
+@router.post("/api/autoresearch/projects/{project_id}/start-planning")
+async def start_planning_route(project_id: str):
+    state = project_svc.get_project(project_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not state.paper_contexts:
+        raise HTTPException(status_code=400, detail="Build context before planning")
+    result = orchestrator.start_planning(project_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/api/autoresearch/projects/{project_id}/plan/chat")
+async def plan_chat(project_id: str, body: dict):
+    message = body.get("message", "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+    state = project_svc.get_project(project_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    result = orchestrator.handle_plan_chat(project_id, message)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/api/autoresearch/projects/{project_id}/plan/approve")
+async def approve_plan_route(project_id: str):
+    state = project_svc.get_project(project_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    result = orchestrator.approve_plan(project_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+# ============================================================
+# Development cycle
+# ============================================================
+
+@router.post("/api/autoresearch/projects/{project_id}/start-dev")
+async def start_dev(project_id: str):
+    state = project_svc.get_project(project_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    result = orchestrator.start_dev_cycle(project_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/api/autoresearch/projects/{project_id}/start-review")
+async def start_review_route(project_id: str):
+    state = project_svc.get_project(project_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    result = orchestrator.start_review(project_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.get("/api/autoresearch/projects/{project_id}/iteration/{iteration_num}")
+async def get_iteration(project_id: str, iteration_num: int):
+    result = orchestrator.get_iteration_details(project_id, iteration_num)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Iteration not found")
+    return result
+
+
+@router.post("/api/autoresearch/projects/{project_id}/decision")
+async def user_decision(project_id: str, body: UserDecisionRequest):
+    if body.decision not in ("approve", "revise", "guide"):
+        raise HTTPException(status_code=400, detail="Decision must be approve, revise, or guide")
+    result = orchestrator.handle_user_decision(project_id, body.decision, body.guidance)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.get("/api/autoresearch/projects/{project_id}/diff/{from_iter}/{to_iter}")
+async def get_diff(project_id: str, from_iter: int, to_iter: int):
+    diff = orchestrator.get_project_diff(project_id, from_iter, to_iter)
+    if diff is None:
+        raise HTTPException(status_code=404, detail="Diff not available")
+    return {"diff": diff}
+
+
+# ============================================================
+# SSE streaming for agent activity
+# ============================================================
+
+@router.get("/api/autoresearch/projects/{project_id}/stream")
+async def stream_events(project_id: str):
+    """SSE endpoint for real-time agent activity."""
+    state = project_svc.get_project(project_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    async def event_generator():
+        index = 0
+        while True:
+            events = orchestrator.get_events(project_id, after_index=index)
+            for event in events:
+                data = json.dumps(event.model_dump())
+                yield f"data: {data}\n\n"
+                index += 1
+
+                # Stop streaming after completion or error
+                if event.event_type in ("complete", "error"):
+                    yield f"data: {json.dumps({'event_type': 'stream_end'})}\n\n"
+                    return
+
+            await asyncio.sleep(0.5)
+
+            # Safety: if no agent running and no new events, end stream
+            if not orchestrator.is_agent_running(project_id) and not events:
+                yield f"data: {json.dumps({'event_type': 'stream_end'})}\n\n"
+                return
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
