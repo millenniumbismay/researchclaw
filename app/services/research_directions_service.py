@@ -1,5 +1,6 @@
 """Research Directions Service — deep critical analysis and chat interface."""
 
+import datetime
 import json
 import logging
 import os
@@ -29,6 +30,17 @@ MODEL = "claude-haiku-4-5"
 # Track in-progress generations
 _generating: set[str] = set()
 _lock = threading.Lock()
+
+# Per-paper locks for chat serialization
+_chat_locks: dict[str, threading.Lock] = {}
+_chat_locks_lock = threading.Lock()
+
+
+def _get_chat_lock(paper_id: str) -> threading.Lock:
+    with _chat_locks_lock:
+        if paper_id not in _chat_locks:
+            _chat_locks[paper_id] = threading.Lock()
+        return _chat_locks[paper_id]
 
 
 # ============================================================
@@ -152,13 +164,15 @@ def _parse_json(text: str):
     except json.JSONDecodeError:
         pass
 
-    # Try to find a JSON object or array in the text
-    for pattern in [r"\{[\s\S]*\}", r"\[[\s\S]*\]"]:
-        m = re.search(pattern, cleaned)
-        if m:
+    # Try parsing from each { or [ position using raw_decode,
+    # preferring later occurrences (LLMs typically put JSON at the end)
+    decoder = json.JSONDecoder()
+    for i in range(len(cleaned) - 1, -1, -1):
+        if cleaned[i] in ('{', '['):
             try:
-                return json.loads(m.group(0))
-            except json.JSONDecodeError:
+                obj, _ = decoder.raw_decode(cleaned, i)
+                return obj
+            except (json.JSONDecodeError, ValueError):
                 continue
     return None
 
@@ -431,12 +445,9 @@ def start_analysis(paper_id: str) -> str:
     with _lock:
         if paper_id in _generating:
             return "generating"
-
-    existing = get_analysis(paper_id)
-    if existing and existing.status == "ready":
-        return "ready"
-
-    with _lock:
+        existing = get_analysis(paper_id)
+        if existing and existing.status == "ready":
+            return "ready"
         _generating.add(paper_id)
 
     t = threading.Thread(target=_build_analysis_bg, args=(paper_id,), daemon=True)
@@ -511,40 +522,60 @@ If the researcher asks to update/add/remove a research direction, do so and retu
         logger.error(f"Chat LLM call failed: {e}")
         return ChatResponse(reply="Sorry, I encountered an error processing your message. Please try again.")
 
+    # Handle empty LLM response
+    if not reply_text:
+        reply_text = "I wasn't able to generate a response. Please try rephrasing your question."
+
     # Check if reply contains updated_directions JSON
     updated_directions = None
-    json_match = re.search(r'"updated_directions"\s*:\s*(\[[\s\S]*?\])', reply_text)
-    if json_match:
-        try:
-            parsed = json.loads(json_match.group(1))
-            updated_directions = []
-            for item in parsed:
-                if isinstance(item, dict) and item.get("title"):
-                    difficulty = item.get("difficulty", "medium")
-                    if difficulty not in ("low", "medium", "high"):
-                        difficulty = "medium"
-                    updated_directions.append(ResearchDirection(
-                        title=item["title"],
-                        description=item.get("description", ""),
-                        why_it_matters=item.get("why_it_matters", ""),
-                        difficulty=difficulty,
-                        tags=item.get("tags", [])[:5] if isinstance(item.get("tags"), list) else [],
-                    ))
-            # Clean the JSON block from the visible reply
-            reply_text = re.sub(r'```json[\s\S]*?```', '', reply_text).strip()
-            reply_text = re.sub(r'\{[\s\S]*"updated_directions"[\s\S]*\}', '', reply_text).strip()
-        except Exception:
-            updated_directions = None
+    if '"updated_directions"' in reply_text:
+        decoder = json.JSONDecoder()
+        for i in range(len(reply_text)):
+            if reply_text[i] == '{':
+                try:
+                    obj, end = decoder.raw_decode(reply_text, i)
+                    if isinstance(obj, dict) and 'updated_directions' in obj:
+                        parsed = obj['updated_directions']
+                        updated_directions = []
+                        for item in parsed:
+                            if isinstance(item, dict) and item.get("title"):
+                                difficulty = item.get("difficulty", "medium")
+                                if difficulty not in ("low", "medium", "high"):
+                                    difficulty = "medium"
+                                updated_directions.append(ResearchDirection(
+                                    title=item["title"],
+                                    description=item.get("description", ""),
+                                    why_it_matters=item.get("why_it_matters", ""),
+                                    difficulty=difficulty,
+                                    tags=item.get("tags", [])[:5] if isinstance(item.get("tags"), list) else [],
+                                ))
+                        # Surgically remove the JSON block from visible reply
+                        reply_text = (reply_text[:i] + reply_text[end:]).strip()
+                        reply_text = re.sub(r'```json\s*\n?\s*```', '', reply_text).strip()
+                        break
+                except (json.JSONDecodeError, ValueError):
+                    continue
 
-    # Append messages to history and save
-    import datetime
-    now = datetime.datetime.utcnow().isoformat()
-    analysis.chat_history.append(ChatMessage(role="user", content=user_message, timestamp=now))
-    analysis.chat_history.append(ChatMessage(role="assistant", content=reply_text, timestamp=now))
+    # Serialize chat read-modify-write with per-paper lock
+    chat_lock = _get_chat_lock(paper_id)
+    with chat_lock:
+        # Re-read analysis to get latest chat history
+        analysis = get_analysis(paper_id)
+        if not analysis:
+            return ChatResponse(reply=reply_text, updated_directions=updated_directions)
 
-    if updated_directions:
-        analysis.directions = updated_directions
+        now = datetime.datetime.utcnow().isoformat()
+        analysis.chat_history.append(ChatMessage(role="user", content=user_message, timestamp=now))
+        analysis.chat_history.append(ChatMessage(role="assistant", content=reply_text, timestamp=now))
 
-    _save_analysis(analysis)
+        # Cap chat history to prevent unbounded growth
+        max_history = 50
+        if len(analysis.chat_history) > max_history:
+            analysis.chat_history = analysis.chat_history[-max_history:]
+
+        if updated_directions:
+            analysis.directions = updated_directions
+
+        _save_analysis(analysis)
 
     return ChatResponse(reply=reply_text, updated_directions=updated_directions)

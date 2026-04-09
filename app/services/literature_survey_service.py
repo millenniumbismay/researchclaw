@@ -535,14 +535,10 @@ def start_survey_generation(paper_id: str, all_papers: list[dict], force: bool =
     with _lock:
         if paper_id in _generating:
             return "generating"
-
-    # Already done?
-    if not force:
-        existing = get_survey(paper_id)
-        if existing and existing.status == "ready":
-            return "ready"
-
-    with _lock:
+        if not force:
+            existing = get_survey(paper_id)
+            if existing and existing.status == "ready":
+                return "ready"
         _generating.add(paper_id)
 
     t = threading.Thread(target=_build_survey_bg, args=(paper_id, all_papers), daemon=True)

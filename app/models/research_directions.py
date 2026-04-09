@@ -50,7 +50,6 @@ class ResearchDirectionsStatus(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    paper_id: str
 
 
 class ChatResponse(BaseModel):

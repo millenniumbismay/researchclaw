@@ -322,7 +322,7 @@ function sendDirectionsChat(pid) {
   fetch('/api/explorations/' + encodeURIComponent(pid) + '/directions/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: message, paper_id: pid })
+    body: JSON.stringify({ message: message })
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
