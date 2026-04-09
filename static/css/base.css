@@ -17,10 +17,7 @@
   --danger: #f76a6a;
   --success: #6af7a0;
   --warn: #f7b76a;
-
-  /* Backward-compat aliases (removed once Tasks 5-10 rewrite all CSS files) */
   --muted: var(--text-muted);
-  --accent-dim: var(--accent-secondary);
 }
 
 /* ---- DARK THEME (default) ---- */
