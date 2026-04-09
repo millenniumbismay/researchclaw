@@ -196,9 +196,9 @@ function initChart() {
     data: {
       labels,
       datasets: [
-        { label: 'Conf 3', data: crawlHistory.map(e => e.conf3||0), backgroundColor: 'rgba(99,102,241,0.5)', borderColor: 'rgba(99,102,241,0.8)', borderWidth: 1, stack: 's' },
-        { label: 'Conf 4', data: crawlHistory.map(e => e.conf4||0), backgroundColor: 'rgba(124,92,245,0.55)', borderColor: 'rgba(124,92,245,0.8)', borderWidth: 1, stack: 's' },
-        { label: 'Conf 5', data: crawlHistory.map(e => e.conf5||0), backgroundColor: 'rgba(59,130,246,0.55)', borderColor: 'rgba(59,130,246,0.8)', borderWidth: 1, stack: 's' },
+        { label: 'Conf 3', data: crawlHistory.map(e => e.conf3||0), backgroundColor: 'rgba(251,191,36,0.55)', borderColor: 'rgba(251,191,36,0.8)', borderWidth: 1, stack: 's' },
+        { label: 'Conf 4', data: crawlHistory.map(e => e.conf4||0), backgroundColor: 'rgba(124,92,245,0.6)', borderColor: 'rgba(124,92,245,0.85)', borderWidth: 1, stack: 's' },
+        { label: 'Conf 5', data: crawlHistory.map(e => e.conf5||0), backgroundColor: 'rgba(52,211,153,0.55)', borderColor: 'rgba(52,211,153,0.8)', borderWidth: 1, stack: 's' },
       ]
     },
     options: {
