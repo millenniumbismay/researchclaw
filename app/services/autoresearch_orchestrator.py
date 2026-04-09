@@ -584,6 +584,7 @@ def start_dev_cycle(project_id: str, user_guidance: str = "") -> dict:
             loop = asyncio.new_event_loop()
             try:
                 captured_session_id = None
+                agent_errored = False
 
                 async def _consume():
                     nonlocal captured_session_id
@@ -595,10 +596,24 @@ def start_dev_cycle(project_id: str, user_guidance: str = "") -> dict:
                         _push_event(project_id, event)
                         if event.event_type == "complete":
                             captured_session_id = event.metadata.get("session_id")
+                        if event.event_type == "error" or (
+                            event.event_type == "complete" and event.metadata.get("is_error")
+                        ):
+                            nonlocal agent_errored
+                            agent_errored = True
 
                 loop.run_until_complete(_consume())
             finally:
                 loop.close()
+
+            # If the agent errored, set project to error state
+            if agent_errored:
+                with project_svc._get_project_lock(project_id):
+                    state = project_svc.get_project(project_id)
+                    if state:
+                        state.project.status = "error"
+                        project_svc.save_state(state)
+                return
 
             # Update state after completion
             with project_svc._get_project_lock(project_id):
@@ -671,18 +686,32 @@ def start_review(project_id: str) -> dict:
 
             loop = asyncio.new_event_loop()
             review_events: list[AgentStreamEvent] = []
+            review_errored = False
             try:
                 async def _consume():
+                    nonlocal review_errored
                     async for event in cc_svc.run_reviewer(
                         repo_path=repo_path,
                         description=description,
                     ):
                         _push_event(project_id, event)
                         review_events.append(event)
+                        if event.event_type == "error" or (
+                            event.event_type == "complete" and event.metadata.get("is_error")
+                        ):
+                            review_errored = True
 
                 loop.run_until_complete(_consume())
             finally:
                 loop.close()
+
+            if review_errored:
+                with project_svc._get_project_lock(project_id):
+                    state = project_svc.get_project(project_id)
+                    if state:
+                        state.project.status = "error"
+                        project_svc.save_state(state)
+                return
 
             # Build review summary from captured events
             review_messages = [

@@ -18,6 +18,9 @@ crawl_history.json
 # Output (generated, not source)
 output/
 
+# AutoResearch project repos (user-generated, not source)
+autoresearch/
+
 # Claude Code local settings
 .claude/settings.local.json
 
