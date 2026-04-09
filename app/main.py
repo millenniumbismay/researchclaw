@@ -21,17 +21,19 @@ def create_app() -> FastAPI:
     # Ensure required dirs exist
     settings.summaries_dir.mkdir(parents=True, exist_ok=True)
     settings.explorations_dir.mkdir(parents=True, exist_ok=True)
+    settings.autoresearch_dir.mkdir(parents=True, exist_ok=True)
 
     # Static files
     app.mount("/static", StaticFiles(directory=str(settings.base_dir / "static")), name="static")
 
     # Register routers
-    from app.routes import papers, mylist, explorations, settings as settings_routes, feedback
+    from app.routes import papers, mylist, explorations, settings as settings_routes, feedback, autoresearch
     app.include_router(papers.router)
     app.include_router(mylist.router)
     app.include_router(explorations.router)
     app.include_router(settings_routes.router)
     app.include_router(feedback.router)
+    app.include_router(autoresearch.router)
 
     @app.get("/", response_class=HTMLResponse)
     async def root():

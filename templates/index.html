@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="/static/css/explorations.css"/>
 <link rel="stylesheet" href="/static/css/settings.css"/>
 <link rel="stylesheet" href="/static/css/assistant.css"/>
+<link rel="stylesheet" href="/static/css/autoresearch.css"/>
 </head>
 <body>
 
@@ -40,6 +41,10 @@
       <button class="sidebar-btn" data-tab="assistant" onclick="switchTab('assistant')">
         <span class="sidebar-btn-icon">🧠</span>
         <span class="sidebar-btn-label">Assistant</span>
+      </button>
+      <button class="sidebar-btn" data-tab="autoresearch" onclick="switchTab('autoresearch')">
+        <span class="sidebar-btn-icon">🧪</span>
+        <span class="sidebar-btn-label">AutoResearch</span>
       </button>
     </nav>
     <div class="sidebar-bottom">
@@ -239,6 +244,27 @@
   </div>
 </div>
 
+<!-- AUTORESEARCH -->
+<div id="tab-autoresearch" class="tab-pane">
+  <div class="ar-layout" id="ar-layout">
+    <div class="ar-left" id="ar-left">
+      <div class="ar-left-header">
+        <span class="ar-left-title">Projects</span>
+        <button class="ar-new-btn" onclick="arCreateProject()">+ New</button>
+      </div>
+      <div class="ar-project-list" id="ar-project-list"></div>
+    </div>
+    <div class="ar-main" id="ar-main">
+      <div class="ar-empty" id="ar-empty">
+        <div class="ar-empty-icon">🧪</div>
+        <h3>AutoResearch</h3>
+        <p>Implement research papers as modular code using multi-agent AI.</p>
+        <button class="btn-generate-survey" onclick="arCreateProject()">+ New Project</button>
+      </div>
+    </div>
+  </div>
+</div>
+
   </main>
 </div><!-- .app-layout -->
 
@@ -254,6 +280,7 @@
 <script src="/static/js/literature_survey.js?v=2"></script>
 <script src="/static/js/research_directions.js"></script>
 <script src="/static/js/assistant.js"></script>
+<script src="/static/js/autoresearch.js"></script>
 <script src="/static/js/app.js"></script>
 </body>
 </html>

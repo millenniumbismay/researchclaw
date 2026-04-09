@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     summaries_dir: Path = BASE_DIR / "output" / "summaries"
     explorations_dir: Path = BASE_DIR / "output" / "explorations"
     paper_content_dir: Path = BASE_DIR / "output" / "paper_content"
+    autoresearch_dir: Path = BASE_DIR / "output" / "autoresearch"
     feedback_path: Path = BASE_DIR / "feedback.json"
     mylist_path: Path = BASE_DIR / "mylist.json"
     prefs_path: Path = BASE_DIR / "preferences.yaml"

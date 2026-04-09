@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!e.target.closest('.tag-filter-wrap'))
       document.getElementById('tag-filter-menu').classList.remove('open');
   });
-  await Promise.all([loadPapers(), loadMyList(), loadCrawlHistory(), loadPrefs(), loadExplorations()]);
+  await Promise.all([loadPapers(), loadMyList(), loadCrawlHistory(), loadPrefs(), loadExplorations(), loadARProjects()]);
   renderPaperFeed();
   renderMyList();
   renderExplorationsList();
