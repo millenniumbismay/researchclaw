@@ -126,6 +126,39 @@ inside triple-backtick json fences. The JSON must conform to this schema:
     # Assess clarity
     # ------------------------------------------------------------------
 
+    def _system_with_cache(self) -> list[dict]:
+        """Return the system prompt as a cacheable content block."""
+        return [
+            {
+                "type": "text",
+                "text": self._build_system_prompt(),
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
+    @staticmethod
+    def _merge_consecutive_roles(messages: list[dict]) -> list[dict]:
+        """Merge consecutive messages with the same role to satisfy API contract.
+
+        The Anthropic API requires strictly alternating user/assistant roles.
+        If consecutive messages share a role, their content is joined with newlines.
+        """
+        if not messages:
+            return messages
+        merged: list[dict] = [messages[0].copy()]
+        for msg in messages[1:]:
+            if msg["role"] == merged[-1]["role"]:
+                prev_content = merged[-1]["content"]
+                cur_content = msg["content"]
+                # Handle both str and list content formats
+                if isinstance(prev_content, str) and isinstance(cur_content, str):
+                    merged[-1]["content"] = prev_content + "\n\n" + cur_content
+                else:
+                    merged[-1]["content"] = str(prev_content) + "\n\n" + str(cur_content)
+            else:
+                merged.append(msg.copy())
+        return merged
+
     def assess_clarity(self) -> dict:
         """Single LLM call to assess whether the project scope is clear enough to plan.
 
@@ -140,7 +173,7 @@ inside triple-backtick json fences. The JSON must conform to this schema:
                 "message": "API key is not configured. Please set ANTHROPIC_API_KEY to enable the planner.",
             }
 
-        system = self._build_system_prompt()
+        system = self._system_with_cache()
         messages = [
             {
                 "role": "user",
@@ -204,7 +237,7 @@ inside triple-backtick json fences. The JSON must conform to this schema:
         if not os.environ.get("ANTHROPIC_API_KEY"):
             return "Cannot generate plan without ANTHROPIC_API_KEY.", None
 
-        system = self._build_system_prompt()
+        system = self._system_with_cache()
 
         prompt = "Please draft an implementation plan for this project."
         if user_requirements:
@@ -251,7 +284,7 @@ inside triple-backtick json fences. The JSON must conform to this schema:
         if not os.environ.get("ANTHROPIC_API_KEY"):
             return "Cannot chat without ANTHROPIC_API_KEY.", None
 
-        system = self._build_system_prompt()
+        system = self._system_with_cache()
 
         messages: list[dict] = []
         for msg in history:
@@ -263,6 +296,20 @@ inside triple-backtick json fences. The JSON must conform to this schema:
             messages.append({"role": role, "content": msg.content})
 
         messages.append({"role": "user", "content": user_message})
+
+        # Merge consecutive same-role messages (e.g. back-to-back planner messages)
+        # to satisfy the Anthropic API alternating-role requirement
+        messages = self._merge_consecutive_roles(messages)
+
+        # Mark the second-to-last message for prompt caching so the growing
+        # conversation prefix is cached across turns
+        if len(messages) >= 2:
+            cache_msg = messages[-2]
+            content = cache_msg["content"]
+            if isinstance(content, str):
+                cache_msg["content"] = [
+                    {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+                ]
 
         try:
             response = self.client.messages.create(

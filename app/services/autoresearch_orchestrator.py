@@ -532,9 +532,18 @@ Focus on addressing the specific issues raised. Do not rewrite code unnecessaril
 def start_dev_cycle(project_id: str, user_guidance: str = "") -> dict:
     """Start a development cycle in a background thread.
 
-    Guards against duplicate runs. Streams events via the event buffer.
+    Guards against duplicate runs and max iterations.
     Returns ``{"status": "developing"}`` or ``{"error": ...}``.
     """
+    # Guard: max iterations
+    state = project_svc.get_project(project_id)
+    if state is not None and state.project.current_iteration >= state.project.max_iterations:
+        return {"error": f"Maximum iterations ({state.project.max_iterations}) reached."}
+
+    # Guard: correct phase
+    if state is not None and state.project.phase not in ("plan_finalized", "dev_cycle"):
+        return {"error": f"Cannot start dev cycle in phase '{state.project.phase}'."}
+
     # Guard against duplicate
     with _running_lock:
         if project_id in _running:
@@ -659,6 +668,11 @@ def start_review(project_id: str) -> dict:
 
     Returns ``{"status": "reviewing"}`` or ``{"error": ...}``.
     """
+    # Guard: correct phase
+    state = project_svc.get_project(project_id)
+    if state is not None and state.project.phase != "dev_cycle":
+        return {"error": f"Cannot start review in phase '{state.project.phase}'."}
+
     # Guard against duplicate
     with _running_lock:
         if project_id in _running:

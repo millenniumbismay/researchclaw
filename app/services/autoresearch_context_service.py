@@ -145,7 +145,7 @@ def _repo_name_from_url(url: str) -> str:
 
 
 def _validate_github_url(url: str) -> bool:
-    return bool(re.match(r"https?://github\.com/[\w.-]+/[\w.-]+", url))
+    return bool(re.fullmatch(r"https?://github\.com/[\w.-]+/[\w.-]+/?", url))
 
 
 def _clone_repo(url: str, dest: Path) -> bool:
@@ -248,7 +248,7 @@ def _compute_language_breakdown(root: Path) -> dict[str, float]:
 
     if total == 0:
         return {}
-    return {lang: round(count / total, 3) for lang, count in sorted(counts.items(), key=lambda x: -x[1])}
+    return {lang: round(count / total * 100, 1) for lang, count in sorted(counts.items(), key=lambda x: -x[1])}
 
 
 def _read_file_content(path: Path, max_lines: int = 500) -> str:
@@ -511,12 +511,17 @@ def _build_context_bg(project_id: str) -> None:
                     paper_contexts[0].github_repo_url = url
                     paper_contexts[0].repo_analysis = analysis
 
-        # Save results
+        # Save results — merge with any existing contexts for papers not in this build
         with project_svc._get_project_lock(project_id):
             state = project_svc.get_project(project_id)
             if state is None:
                 return
-            state.paper_contexts = paper_contexts
+            built_ids = {ctx.paper_id for ctx in paper_contexts}
+            existing_kept = [
+                ctx for ctx in state.paper_contexts
+                if ctx.paper_id not in built_ids
+            ]
+            state.paper_contexts = paper_contexts + existing_kept
             state.project.phase = "planning_chat"  # Ready for Phase B
             project_svc.save_state(state)
 

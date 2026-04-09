@@ -12,10 +12,6 @@ let _arCreateMode = false;
 // INIT
 // ============================================================
 
-function initAutoResearch() {
-  loadARProjects();
-}
-
 async function loadARProjects() {
   try {
     const r = await fetch('/api/autoresearch/projects');

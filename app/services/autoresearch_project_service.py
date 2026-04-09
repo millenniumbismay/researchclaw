@@ -136,6 +136,14 @@ def save_state(state: AutoResearchState) -> None:
 
 def delete_project(project_id: str) -> bool:
     import shutil
+    # Clean up the git repo directory if it exists
+    state = get_project(project_id)
+    if state and state.project.repo_path:
+        from pathlib import Path
+        repo_dir = Path(state.project.repo_path)
+        if repo_dir.exists():
+            shutil.rmtree(repo_dir, ignore_errors=True)
+    # Clean up state directory
     folder = _project_dir(project_id)
     if folder.exists():
         shutil.rmtree(folder)

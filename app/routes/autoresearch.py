@@ -55,6 +55,8 @@ async def get_project(project_id: str):
 
 @router.delete("/api/autoresearch/projects/{project_id}")
 async def delete_project(project_id: str):
+    if orchestrator.is_agent_running(project_id):
+        raise HTTPException(status_code=409, detail="Cannot delete while an agent is running")
     project_svc.delete_project(project_id)
     return {"status": "deleted"}
 
@@ -247,8 +249,18 @@ async def stream_events(project_id: str):
         raise HTTPException(status_code=404, detail="Project not found")
 
     async def event_generator():
+        import time
         index = 0
+        start_time = time.monotonic()
+        max_duration = 30 * 60  # 30 minutes
+
         while True:
+            # Timeout guard
+            if time.monotonic() - start_time > max_duration:
+                yield f"data: {json.dumps({'event_type': 'error', 'content': 'Stream timeout (30 min)'})}\n\n"
+                yield f"data: {json.dumps({'event_type': 'stream_end'})}\n\n"
+                return
+
             events = orchestrator.get_events(project_id, after_index=index)
             for event in events:
                 data = json.dumps(event.model_dump())
