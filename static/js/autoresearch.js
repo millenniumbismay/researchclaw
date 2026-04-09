@@ -478,6 +478,14 @@ async function _arPollStatus() {
       msgEl.textContent = data.build_progress;
     }
 
+    // Check if build errored (status returned to idle while still in context_gathering phase)
+    if (data.build_status === 'idle' && data.phase === 'context_gathering' && (!data.paper_contexts || data.paper_contexts.length === 0)) {
+      _arStopPolling();
+      showToast('Context build failed. Check logs and try again.', 'error');
+      await arSelectProject(_arSelectedId);
+      return;
+    }
+
     // Check if build is complete
     if (data.build_status === 'ready' || (data.paper_contexts && data.paper_contexts.length > 0 && data.build_status !== 'building')) {
       _arStopPolling();

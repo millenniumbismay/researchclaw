@@ -155,9 +155,10 @@ def _message_to_events(message, agent_name: str) -> list[AgentStreamEvent]:
                 ))
 
     elif isinstance(message, ResultMessage):
+        is_error = getattr(message, "is_error", False)
         events.append(AgentStreamEvent(
-            event_type="complete",
-            content="Agent run completed.",
+            event_type="error" if is_error else "complete",
+            content="Agent run failed." if is_error else "Agent run completed.",
             timestamp=now,
             metadata={
                 "agent": agent_name,
@@ -165,7 +166,7 @@ def _message_to_events(message, agent_name: str) -> list[AgentStreamEvent]:
                 "duration_ms": getattr(message, "duration_ms", None),
                 "cost_usd": getattr(message, "total_cost_usd", None),
                 "num_turns": getattr(message, "num_turns", None),
-                "is_error": getattr(message, "is_error", False),
+                "is_error": is_error,
             },
         ))
 

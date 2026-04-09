@@ -384,7 +384,9 @@ def handle_plan_chat(project_id: str, user_message: str) -> dict:
         if state is None:
             return {"error": "Project not found."}
 
-        response_text, plan = planner.chat(state.planning_chat, user_message)
+        # Pass history excluding the last message (the user message we just appended)
+        # because planner.chat() appends user_message separately
+        response_text, plan = planner.chat(state.planning_chat[:-1], user_message)
 
         # Store response
         with project_svc._get_project_lock(project_id):
@@ -579,6 +581,13 @@ def start_dev_cycle(project_id: str, user_guidance: str = "") -> dict:
 
             # Run the developer agent (async -> sync bridge)
             repo_path = state.project.repo_path
+            if not repo_path:
+                _push_event(project_id, AgentStreamEvent(
+                    event_type="error",
+                    content="Project repo path not set. Run start-planning first.",
+                    metadata={"agent": "orchestrator"},
+                ))
+                return
             session_id = state.project.claude_code_session_id
 
             loop = asyncio.new_event_loop()
