@@ -27,6 +27,9 @@ autoresearch/
 # Superpowers plugin working directory
 .superpowers/
 
+# Git worktrees
+.worktrees/
+
 # Docs (generated logs, specs, plans)
 docs/
 
