@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Branch:** `frontend_redesign_2026-04-08` (pending merge to `main`)
-- **Last updated:** 2026-04-08
+- **Branch:** `autoresearch_phase_b_2026-04-09` (pending merge to `main`)
+- **Last updated:** 2026-04-09
 - **Stack:** FastAPI + Pydantic (backend), Vanilla JS + D3.js + Chart.js (frontend)
 - **Test suite:** None yet
 - **Deployment:** Local only (`localhost:7337`)
@@ -27,7 +27,8 @@
 | Frontend redesign (dark/light/system themes) | Done | `static/js/theme.js`, all CSS files, `templates/index.html` |
 | Sidebar navigation | Done | `templates/index.html`, `static/css/base.css`, `static/js/app.js` |
 | Research Directions | Done | `static/js/research_directions.js`, `app/routes/explorations.py` |
-| Autonomous experiments / autoresearch | Not started | — |
+| AutoResearch — Tab + project management + context pipeline | Done | `app/routes/autoresearch.py`, `app/services/autoresearch_*`, `static/js/autoresearch.js` |
+| AutoResearch — Multi-agent dev loop (plan → dev → review) | Done | `app/services/autoresearch_agents.py`, `autoresearch_orchestrator.py`, `autoresearch_claude_code_service.py` |
 
 ## Architecture Decisions
 
@@ -40,10 +41,31 @@
 | Batched Claude API calls | 5 paper pairs per call reduces cost ~5x vs per-pair |
 | arXiv HTML extraction + sanitization | Get original Related Work section; sanitize to prevent XSS |
 | `claude-haiku-4-5` for all automated calls | Cost-efficient for high-volume operations |
+| Anthropic SDK for planning, Claude Agent SDK for dev/review | Right tool for each: chat vs filesystem agent |
+| Prompt caching on system + history prefix | Reduces cost for multi-turn planning with large paper contexts |
+| Standalone git repos per AutoResearch project | Isolation between experiments; `uv` for fast venv |
+| SSE for agent activity streaming | Simpler than WebSocket for unidirectional server→client events |
 
 ## Session Log
 
 <!-- Add new sessions at the top. Keep entries concise. -->
+
+### 2026-04-09 — AutoResearch Phase A + B
+
+**Branch:** `autoresearch_phase_a_2026-04-09` → `autoresearch_phase_b_2026-04-09`
+
+**What was done:**
+- Phase A: AutoResearch tab, project CRUD, paper selection (MyList + arXiv URL), GitHub repo cloning/analysis, LLM-powered context extraction pipeline
+- Phase B: PlannerAgent (Anthropic SDK, Opus 4.6) with prompt caching, Claude Code developer/reviewer agents, orchestrator state machine (planning → dev → review → user decision loop), SSE streaming, full frontend UI for all phases
+- Adversarial review (Critic/Tester/Advocate/Judge) caught 10 issues, all fixed: max_iterations enforcement, consecutive same-role message merging, delete guards, URL validation, context merge, SSE timeout, phase guards
+
+**Key files created:**
+- `app/services/autoresearch_agents.py`, `autoresearch_claude_code_service.py`, `autoresearch_orchestrator.py`
+- `app/services/autoresearch_project_service.py`, `autoresearch_context_service.py`
+- `app/models/autoresearch.py`, `app/routes/autoresearch.py`
+- `static/js/autoresearch.js`, `static/css/autoresearch.css`
+
+---
 
 ### 2026-04-08 — Frontend Redesign
 

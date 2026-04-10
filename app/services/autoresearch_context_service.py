@@ -429,6 +429,12 @@ def _build_context_bg(project_id: str) -> None:
 
         for paper_id in paper_ids_to_process:
             paper_data = get_paper_by_id(paper_id)
+            if paper_data is None and paper_id.startswith("arxiv:"):
+                # Paper was added via URL fetch and isn't in the papers cache.
+                # Fall back to fetching metadata directly from arXiv.
+                arxiv_id = paper_id[len("arxiv:"):]
+                url = f"https://arxiv.org/abs/{arxiv_id}"
+                paper_data = fetch_paper_by_url(url)
             if paper_data is None:
                 logger.warning(f"Paper {paper_id} not found, skipping")
                 continue

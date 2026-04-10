@@ -1,5 +1,8 @@
 """FastAPI app factory for ResearchClaw."""
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import markdown as md_lib
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
