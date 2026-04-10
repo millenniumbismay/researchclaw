@@ -110,6 +110,7 @@ class AutoResearchProject(BaseModel):
     max_iterations: int = 5
     repo_path: Optional[str] = None  # Absolute path to the project git repo
     claude_code_session_id: Optional[str] = None  # For resuming Claude Code sessions
+    planning_session_id: Optional[str] = None  # For resuming planner chat sessions
     created_at: str = Field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
 

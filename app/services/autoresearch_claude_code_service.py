@@ -38,6 +38,7 @@ async def run_developer(
             allowed_tools=["Read", "Edit", "Write", "Bash", "Glob", "Grep"],
             permission_mode="acceptEdits",
             model="claude-opus-4-6",
+            env={"ANTHROPIC_API_KEY": ""},
         )
 
         if session_id:
@@ -80,6 +81,7 @@ async def run_reviewer(
             allowed_tools=["Read", "Edit", "Write", "Bash", "Glob", "Grep", "Agent"],
             permission_mode="acceptEdits",
             model="claude-opus-4-6",
+            env={"ANTHROPIC_API_KEY": ""},
         )
 
         async for message in query(prompt=review_prompt, options=options):

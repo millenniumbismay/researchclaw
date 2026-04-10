@@ -1,15 +1,15 @@
-"""AutoResearch Agents — Planner agent for Phase B planning chat."""
+"""AutoResearch Agents — Planner agent for Phase B planning chat.
+
+Uses claude-agent-sdk (same auth as Claude Code) instead of the raw Anthropic SDK,
+so all LLM calls go through the user's existing Claude subscription.
+"""
 
 import json
 import logging
-import os
 import re
 from typing import Optional
 
-import anthropic
-
 from app.models.autoresearch import (
-    AgentMessage,
     ImplementationPlan,
     PaperContext,
     PlanModule,
@@ -23,9 +23,8 @@ MODEL = "claude-opus-4-6"
 class PlannerAgent:
     """Conversational planner that turns paper context into an implementation plan.
 
-    The Planner runs as a multi-turn chat via the Anthropic SDK.  It ingests
-    paper contexts (summaries, methods, repo analyses) and, through
-    conversation with the user, produces a structured ImplementationPlan.
+    Uses claude-agent-sdk with allowed_tools=[] for pure text generation.
+    Multi-turn conversation state is managed by the SDK via session resumption.
     """
 
     def __init__(
@@ -33,12 +32,13 @@ class PlannerAgent:
         paper_contexts: list[PaperContext],
         project_name: str,
         project_description: str = "",
+        session_id: Optional[str] = None,
     ) -> None:
         self.paper_contexts = paper_contexts
         self.project_name = project_name
         self.project_description = project_description
         self.model = MODEL
-        self.client = anthropic.Anthropic()
+        self.session_id = session_id
 
     # ------------------------------------------------------------------
     # System prompt
@@ -123,78 +123,80 @@ inside triple-backtick json fences. The JSON must conform to this schema:
 - Only produce the plan JSON when you are confident the requirements are clear."""
 
     # ------------------------------------------------------------------
+    # SDK helper
+    # ------------------------------------------------------------------
+
+    async def _query_sdk(self, prompt: str, use_system: bool = False) -> tuple[str, Optional[str]]:
+        """Run a query through claude-agent-sdk and collect text output.
+
+        Args:
+            prompt: The user prompt to send.
+            use_system: If True, include system_prompt (for first call in session).
+
+        Returns:
+            Tuple of (collected_text, session_id).
+        """
+        from claude_agent_sdk import ClaudeAgentOptions, query
+        from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+
+        def _log_stderr(line: str) -> None:
+            logger.debug(f"planner sdk stderr: {line}")
+
+        # Prevent an invalid ANTHROPIC_API_KEY in the environment from
+        # overriding the SDK's own OAuth auth by explicitly unsetting it.
+        sdk_env = {"ANTHROPIC_API_KEY": ""}
+
+        options = ClaudeAgentOptions(
+            allowed_tools=[],
+            model=self.model,
+            stderr=_log_stderr,
+            env=sdk_env,
+        )
+
+        if self.session_id:
+            options.resume = self.session_id
+        elif use_system:
+            options.system_prompt = self._build_system_prompt()
+
+        text_parts: list[str] = []
+        captured_session_id: Optional[str] = None
+
+        async for message in query(prompt=prompt, options=options):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        text_parts.append(block.text)
+            elif isinstance(message, ResultMessage):
+                captured_session_id = getattr(message, "session_id", None)
+                if getattr(message, "is_error", False):
+                    logger.error(f"SDK query returned error for planner")
+
+        return "".join(text_parts), captured_session_id
+
+    # ------------------------------------------------------------------
     # Assess clarity
     # ------------------------------------------------------------------
 
-    def _system_with_cache(self) -> list[dict]:
-        """Return the system prompt as a cacheable content block."""
-        return [
-            {
-                "type": "text",
-                "text": self._build_system_prompt(),
-                "cache_control": {"type": "ephemeral"},
-            }
-        ]
-
-    @staticmethod
-    def _merge_consecutive_roles(messages: list[dict]) -> list[dict]:
-        """Merge consecutive messages with the same role to satisfy API contract.
-
-        The Anthropic API requires strictly alternating user/assistant roles.
-        If consecutive messages share a role, their content is joined with newlines.
-        """
-        if not messages:
-            return messages
-        merged: list[dict] = [messages[0].copy()]
-        for msg in messages[1:]:
-            if msg["role"] == merged[-1]["role"]:
-                prev_content = merged[-1]["content"]
-                cur_content = msg["content"]
-                # Handle both str and list content formats
-                if isinstance(prev_content, str) and isinstance(cur_content, str):
-                    merged[-1]["content"] = prev_content + "\n\n" + cur_content
-                else:
-                    merged[-1]["content"] = str(prev_content) + "\n\n" + str(cur_content)
-            else:
-                merged.append(msg.copy())
-        return merged
-
-    def assess_clarity(self) -> dict:
+    async def assess_clarity(self) -> dict:
         """Single LLM call to assess whether the project scope is clear enough to plan.
 
         Returns:
             dict with keys "assessment" ("clear" | "needs_clarification") and "message".
         """
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            logger.warning("ANTHROPIC_API_KEY not set — returning needs_clarification fallback")
-            return {
-                "assessment": "needs_clarification",
-                "message": "API key is not configured. Please set ANTHROPIC_API_KEY to enable the planner.",
-            }
-
-        system = self._system_with_cache()
-        messages = [
-            {
-                "role": "user",
-                "content": (
-                    "Based on the project description and paper context above, "
-                    "assess whether there is enough information to draft an implementation plan. "
-                    'Respond with a JSON object: {"assessment": "clear" or "needs_clarification", '
-                    '"message": "your explanation"}. '
-                    "Only output the JSON, no other text."
-                ),
-            }
-        ]
+        prompt = (
+            "Based on the project description and paper context above, "
+            "assess whether there is enough information to draft an implementation plan. "
+            'Respond with a JSON object: {"assessment": "clear" or "needs_clarification", '
+            '"message": "your explanation"}. '
+            "Only output the JSON, no other text."
+        )
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=1024,
-                system=system,
-                messages=messages,
-            )
-            text = response.content[0].text.strip()
+            text, session_id = await self._query_sdk(prompt, use_system=True)
+            if session_id:
+                self.session_id = session_id
+
+            text = text.strip()
 
             # Try to parse the response as JSON directly
             try:
@@ -215,7 +217,7 @@ inside triple-backtick json fences. The JSON must conform to this schema:
             return {"assessment": "needs_clarification", "message": text}
 
         except Exception:
-            logger.error("assess_clarity LLM call failed", exc_info=True)
+            logger.error("assess_clarity SDK call failed", exc_info=True)
             return {
                 "assessment": "needs_clarification",
                 "message": "Failed to assess project clarity due to an internal error. Please try again.",
@@ -225,8 +227,8 @@ inside triple-backtick json fences. The JSON must conform to this schema:
     # Draft plan
     # ------------------------------------------------------------------
 
-    def draft_plan(self, user_requirements: str = "") -> tuple[str, Optional[ImplementationPlan]]:
-        """Generate an implementation plan in a single LLM call.
+    async def draft_plan(self, user_requirements: str = "") -> tuple[str, Optional[ImplementationPlan]]:
+        """Generate an implementation plan via the SDK.
 
         Args:
             user_requirements: Optional additional requirements from the user.
@@ -234,96 +236,48 @@ inside triple-backtick json fences. The JSON must conform to this schema:
         Returns:
             Tuple of (assistant_text, ImplementationPlan or None).
         """
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            return "Cannot generate plan without ANTHROPIC_API_KEY.", None
-
-        system = self._system_with_cache()
-
         prompt = "Please draft an implementation plan for this project."
         if user_requirements:
             prompt += f"\n\nAdditional requirements from the user:\n{user_requirements}"
 
-        messages = [{"role": "user", "content": prompt}]
-
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=system,
-                messages=messages,
-            )
-            text = response.content[0].text
+            text, session_id = await self._query_sdk(prompt)
+            if session_id:
+                self.session_id = session_id
+
             plan = self._extract_plan(text)
             return text, plan
 
         except Exception:
-            logger.error("draft_plan LLM call failed", exc_info=True)
+            logger.error("draft_plan SDK call failed", exc_info=True)
             return "Failed to generate a plan due to an internal error. Please try again.", None
 
     # ------------------------------------------------------------------
     # Chat
     # ------------------------------------------------------------------
 
-    def chat(
-        self,
-        history: list[AgentMessage],
-        user_message: str,
-    ) -> tuple[str, Optional[ImplementationPlan]]:
-        """Continue the planning conversation.
+    async def chat(self, user_message: str) -> tuple[str, Optional[ImplementationPlan]]:
+        """Continue the planning conversation via session resumption.
 
-        Builds the message list from history (mapping planner -> assistant role)
-        and appends the current user message.
+        The SDK maintains full conversation history internally via the session.
+        No need to pass message history — just resume and send the new message.
 
         Args:
-            history: Previous AgentMessage objects from the planning chat.
             user_message: The latest message from the user.
 
         Returns:
             Tuple of (assistant_text, ImplementationPlan or None).
         """
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            return "Cannot chat without ANTHROPIC_API_KEY.", None
-
-        system = self._system_with_cache()
-
-        messages: list[dict] = []
-        for msg in history:
-            if msg.role == "user":
-                role = "user"
-            else:
-                # planner, system, or any other role maps to assistant
-                role = "assistant"
-            messages.append({"role": role, "content": msg.content})
-
-        messages.append({"role": "user", "content": user_message})
-
-        # Merge consecutive same-role messages (e.g. back-to-back planner messages)
-        # to satisfy the Anthropic API alternating-role requirement
-        messages = self._merge_consecutive_roles(messages)
-
-        # Mark the second-to-last message for prompt caching so the growing
-        # conversation prefix is cached across turns
-        if len(messages) >= 2:
-            cache_msg = messages[-2]
-            content = cache_msg["content"]
-            if isinstance(content, str):
-                cache_msg["content"] = [
-                    {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
-                ]
-
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=system,
-                messages=messages,
-            )
-            text = response.content[0].text
+            text, session_id = await self._query_sdk(user_message)
+            if session_id:
+                self.session_id = session_id
+
             plan = self._extract_plan(text)
             return text, plan
 
         except Exception:
-            logger.error("chat LLM call failed", exc_info=True)
+            logger.error("chat SDK call failed", exc_info=True)
             return "Failed to process your message due to an internal error. Please try again.", None
 
     # ------------------------------------------------------------------

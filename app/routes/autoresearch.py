@@ -154,7 +154,7 @@ async def start_planning_route(project_id: str):
         raise HTTPException(status_code=404, detail="Project not found")
     if not state.paper_contexts:
         raise HTTPException(status_code=400, detail="Build context before planning")
-    result = orchestrator.start_planning(project_id)
+    result = await orchestrator.start_planning(project_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -168,7 +168,7 @@ async def plan_chat(project_id: str, body: dict):
     state = project_svc.get_project(project_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    result = orchestrator.handle_plan_chat(project_id, message)
+    result = await orchestrator.handle_plan_chat(project_id, message)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result

@@ -273,7 +273,7 @@ def generate_claude_md(project_id: str) -> bool:
 # Planning phase
 # ============================================================
 
-def start_planning(project_id: str) -> dict:
+async def start_planning(project_id: str) -> dict:
     """Kick off the planning phase: init repo, generate context, assess clarity.
 
     Returns dict with keys ``assessment``, ``message``, ``has_plan`` (or ``error``).
@@ -305,10 +305,11 @@ def start_planning(project_id: str) -> dict:
             paper_contexts=state.paper_contexts,
             project_name=state.project.name,
             project_description=state.project.description,
+            session_id=state.project.planning_session_id,
         )
-        assessment = planner.assess_clarity()
+        assessment = await planner.assess_clarity()
 
-        # Store assessment message in planning chat
+        # Store assessment message and session_id
         with project_svc._get_project_lock(project_id):
             state = project_svc.get_project(project_id)
             if state is None:
@@ -318,6 +319,8 @@ def start_planning(project_id: str) -> dict:
                 content=assessment.get("message", ""),
                 agent_name="planner",
             ))
+            if planner.session_id:
+                state.project.planning_session_id = planner.session_id
             project_svc.save_state(state)
 
         result = {
@@ -328,7 +331,7 @@ def start_planning(project_id: str) -> dict:
 
         # If scope is clear, also draft a plan
         if assessment.get("assessment") == "clear":
-            plan_text, plan = planner.draft_plan()
+            plan_text, plan = await planner.draft_plan()
             with project_svc._get_project_lock(project_id):
                 state = project_svc.get_project(project_id)
                 if state is None:
@@ -341,6 +344,8 @@ def start_planning(project_id: str) -> dict:
                 if plan is not None:
                     state.plan = plan
                     result["has_plan"] = True
+                if planner.session_id:
+                    state.project.planning_session_id = planner.session_id
                 project_svc.save_state(state)
 
         return result
@@ -350,7 +355,7 @@ def start_planning(project_id: str) -> dict:
         return {"error": "An unexpected error occurred during planning setup."}
 
 
-def handle_plan_chat(project_id: str, user_message: str) -> dict:
+async def handle_plan_chat(project_id: str, user_message: str) -> dict:
     """Handle a user message in the planning chat.
 
     Returns dict with ``message``, ``has_plan`` (or ``error``).
@@ -372,23 +377,17 @@ def handle_plan_chat(project_id: str, user_message: str) -> dict:
             ))
             project_svc.save_state(state)
 
-        # Build planner and chat
+        # Build planner with session resumption — SDK manages conversation history
         planner = PlannerAgent(
             paper_contexts=state.paper_contexts,
             project_name=state.project.name,
             project_description=state.project.description,
+            session_id=state.project.planning_session_id,
         )
 
-        # Re-read state to get the latest planning_chat (with user message appended)
-        state = project_svc.get_project(project_id)
-        if state is None:
-            return {"error": "Project not found."}
+        response_text, plan = await planner.chat(user_message)
 
-        # Pass history excluding the last message (the user message we just appended)
-        # because planner.chat() appends user_message separately
-        response_text, plan = planner.chat(state.planning_chat[:-1], user_message)
-
-        # Store response
+        # Store response and updated session_id
         with project_svc._get_project_lock(project_id):
             state = project_svc.get_project(project_id)
             if state is None:
@@ -402,6 +401,8 @@ def handle_plan_chat(project_id: str, user_message: str) -> dict:
             if plan is not None:
                 state.plan = plan
                 has_plan = True
+            if planner.session_id:
+                state.project.planning_session_id = planner.session_id
             project_svc.save_state(state)
 
         return {"message": response_text, "has_plan": has_plan}

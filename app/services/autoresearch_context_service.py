@@ -1,16 +1,14 @@
 """AutoResearch Context Service — paper content + GitHub repo analysis pipeline."""
 
+import asyncio
 import datetime
 import json
 import logging
-import os
 import re
 import subprocess
 import threading
 from pathlib import Path
 from typing import Optional
-
-import anthropic
 
 from app.config import settings
 from app.models.autoresearch import PaperContext, RepoAnalysis
@@ -263,12 +261,35 @@ def _read_file_content(path: Path, max_lines: int = 500) -> str:
         return ""
 
 
+def _llm_query_sync(prompt: str, model: str = MODEL) -> str:
+    """Run a single-shot LLM query via claude-agent-sdk synchronously.
+
+    Called from background threads (no running event loop), so asyncio.run() is safe.
+    """
+    async def _run():
+        from claude_agent_sdk import ClaudeAgentOptions, query
+        from claude_agent_sdk import AssistantMessage, TextBlock
+
+        # Unset ANTHROPIC_API_KEY so the SDK uses its own OAuth auth
+        options = ClaudeAgentOptions(
+            allowed_tools=[],
+            model=model,
+            env={"ANTHROPIC_API_KEY": ""},
+        )
+
+        text_parts: list[str] = []
+        async for message in query(prompt=prompt, options=options):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        text_parts.append(block.text)
+        return "".join(text_parts)
+
+    return asyncio.run(_run())
+
+
 def _analyze_repo_with_llm(repo_url: str, tree: str, key_file_contents: dict[str, str]) -> RepoAnalysis:
     """Use LLM to analyze a cloned repo."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        logger.warning("ANTHROPIC_API_KEY not set — skipping LLM repo analysis")
-        return RepoAnalysis(repo_url=repo_url, architecture_notes="LLM analysis skipped: API key not configured")
-
     key_files_text = ""
     for path, content in key_file_contents.items():
         key_files_text += f"\n--- {path} ---\n{content}\n"
@@ -291,13 +312,8 @@ Provide your analysis as JSON with these fields:
 Return ONLY valid JSON, no markdown fences."""
 
     try:
-        client = anthropic.Anthropic()
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = response.content[0].text.strip()
+        text = _llm_query_sync(prompt)
+        text = text.strip()
         # Strip markdown fences if present
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
@@ -323,14 +339,6 @@ def _extract_paper_context_with_llm(paper_data: dict, cached_content: Optional[d
     """Use LLM to extract key methods and algorithms from a paper."""
     title = paper_data.get("title", "Unknown")
     abstract = paper_data.get("abstract", "")
-
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        logger.warning("ANTHROPIC_API_KEY not set — skipping LLM paper context extraction")
-        return PaperContext(
-            paper_id=paper_data.get("id", "unknown"),
-            title=title,
-            content_summary=abstract,
-        )
     summary = paper_data.get("summary", "")
 
     # Build content from available sources
@@ -359,13 +367,8 @@ Provide your analysis as JSON with these fields:
 Return ONLY valid JSON, no markdown fences."""
 
     try:
-        client = anthropic.Anthropic()
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = response.content[0].text.strip()
+        text = _llm_query_sync(prompt)
+        text = text.strip()
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
         data = json.loads(text)
