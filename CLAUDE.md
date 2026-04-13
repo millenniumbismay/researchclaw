@@ -12,9 +12,9 @@ conda activate ar # Activate conda env
 
 - `python crawl.py` — fetch and classify papers from configured sources
 - `python summarize.py` — generate summaries + send Telegram notifications
-- `uvicorn app:app --port 7337` — start web server
+- `python -m uvicorn app.main:app --port 7337` — start web server
 - `./run.sh` — crawl + summarize in one shot
-- `./start_ui.sh` — launch web UI
+- `./start_ui.sh` — launch web UI (sources .env, uses correct entry point)
 
 ## Summary and Memory Bank
 
@@ -28,11 +28,12 @@ conda activate ar # Activate conda env
 
 - **Backend:** FastAPI with Pydantic models, service layer pattern
 - **Frontend:** Vanilla JS + D3.js + Chart.js (no framework)
-- **Entry points:** `app.py` / `ui.py` (web), `crawl.py` (data pipeline), `summarize.py` (AI summaries)
+- **Entry point:** `app/main.py` (FastAPI app factory, loads `.env` via `python-dotenv`)
 - **Models:** `app/models/` — Pydantic data models
 - **Routes:** `app/routes/` — API endpoints (thin, delegate to services)
 - **Services:** `app/services/` — business logic
 - **Static:** `static/css/` and `static/js/` — modular CSS and JS files
+- **AutoResearch agents:** `claude-agent-sdk` for all LLM calls (planner, developer, reviewer, context extraction) — uses Claude subscription auth, no separate API key needed
 
 ## Conventions
 
@@ -41,14 +42,18 @@ conda activate ar # Activate conda env
 - JSON files for state: `papers_cache.json`, `filtered_papers.json`, `mylist.json`, `feedback.json`
 - Paper markdown files use YAML frontmatter for metadata
 - Safe filenames via `_safe_filename()` — lowercase, strip special chars, hyphen-joined
-- Claude model: `claude-haiku-4-5` (defined as `MODEL` constant in scripts)
-- Background tasks (crawls) run in daemon threads via `threading`
+- Claude model: `claude-haiku-4-5` for automated extraction, `claude-opus-4-6` for planner/developer/reviewer
+- Background tasks (crawls, context builds) run in daemon threads via `threading`
+- AutoResearch LLM calls go through `claude-agent-sdk` (OAuth auth), not raw `anthropic` SDK
+- AutoResearch planner uses session resumption — SDK manages conversation history, no manual message merging needed
 
 ## Environment Variables (.env)
 
-- `ANTHROPIC_API_KEY` — required for Claude API
+- `ANTHROPIC_API_KEY` — used by non-AutoResearch services (research directions, literature survey, summaries). AutoResearch uses `claude-agent-sdk` which has its own OAuth auth.
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — for notification delivery
 - `TWITTER_BEARER_TOKEN` — optional, for Twitter/X paper source
+
+**Important:** `.env` is loaded automatically at startup via `python-dotenv`. An invalid `ANTHROPIC_API_KEY` in `.env` can interfere with `claude-agent-sdk` — the SDK's `ClaudeAgentOptions` explicitly unsets it via `env={"ANTHROPIC_API_KEY": ""}` to prevent this.
 
 ## Coding Guideline
 

@@ -58,6 +58,18 @@ A 3-pane layout for deep-diving into any paper from your My List:
 - **Interactive**: hover for tooltips, drag to reposition nodes, zoom & pan (0.25–4x)
 - **Graceful degradation**: falls back to heuristic relation descriptions if the Claude API is unavailable
 
+### 🧪 AutoResearch
+Turn research papers into working code via a multi-agent AI pipeline:
+
+- **Project management** — create projects, select papers from My List or add via arXiv URL, attach GitHub repos
+- **Context extraction** — automated analysis of paper methods, algorithms, and repo architecture via Claude
+- **Interactive planning** — multi-turn chat with a PlannerAgent (Opus 4.6) that reads your papers and designs implementation plans with module breakdown
+- **Development loop** — Claude Code developer agent implements the plan in an isolated git repo with `uv` virtual environments
+- **Adversarial review** — Critic/Tester/Advocate/Judge agents review the code, then you approve, revise, or guide the next iteration
+- **Live streaming** — SSE-powered real-time activity feed showing agent tool use, decisions, and progress
+
+All LLM calls go through your Claude subscription via `claude-agent-sdk` — no separate API key or billing needed.
+
 ### ⚙️ Settings
 - Edit your research interests live (topics, keywords, authors, venues) with chip-based editors
 - Toggle sources (arXiv, Semantic Scholar, HuggingFace, Twitter/X)
@@ -81,11 +93,13 @@ researchclaw/
 │   │   ├── literature_survey.py   # PaperNode, RelationEdge, LiteratureSurveyGraph
 │   │   ├── explorations.py        # ExplorationMeta, ExplorationInitResponse
 │   │   ├── mylist.py              # MyListEntry, MyListUpdate
+│   │   ├── autoresearch.py        # AutoResearch project, plan, agent models
 │   │   └── settings.py            # UserPreferences
 │   ├── routes/                    # API endpoint handlers
 │   │   ├── papers.py              # Paper listing & on-demand summarization
 │   │   ├── mylist.py              # My List CRUD
 │   │   ├── explorations.py        # Exploration init, survey generation & status
+│   │   ├── autoresearch.py        # AutoResearch project + agent endpoints
 │   │   ├── settings.py            # Preferences, crawl trigger, status, history
 │   │   └── feedback.py            # User feedback (save/dismiss)
 │   └── services/                  # Business logic
@@ -93,7 +107,12 @@ researchclaw/
 │       ├── summary_service.py     # On-demand Claude summarization
 │       ├── mylist_service.py      # My List management & enrichment
 │       ├── crawl_service.py       # Background crawl orchestration
-│       └── literature_survey_service.py  # Knowledge graph + AI survey generation
+│       ├── literature_survey_service.py  # Knowledge graph + AI survey generation
+│       ├── autoresearch_project_service.py  # AutoResearch project CRUD
+│       ├── autoresearch_context_service.py  # Paper/repo context extraction pipeline
+│       ├── autoresearch_agents.py           # PlannerAgent (claude-agent-sdk)
+│       ├── autoresearch_orchestrator.py     # Multi-agent state machine
+│       └── autoresearch_claude_code_service.py  # Developer/reviewer agent wrapper
 ├── static/
 │   ├── css/                       # Modular stylesheets (base, components, dashboard, mylist, explorations, settings)
 │   └── js/                        # Vanilla JS modules
@@ -105,6 +124,7 @@ researchclaw/
 │       ├── mylist.js              # My List rendering & interactions
 │       ├── explorations.js        # 3-pane layout, paper selection
 │       ├── literature_survey.js   # D3 knowledge graph, survey polling
+│       ├── autoresearch.js        # AutoResearch UI (project mgmt, planning, dev cycle)
 │       └── settings.js            # Preferences UI
 ├── templates/
 │   └── index.html                 # Single-page app shell
@@ -273,7 +293,8 @@ Without OpenClaw, schedule `./run.sh` via cron manually:
 
 - [ ] Full-text fetching for non-arXiv papers (Semantic Scholar + DOI resolvers)
 - [ ] Author following — notify when a specific researcher publishes
-- [ ] Research Directions — AI-suggested future work based on paper analysis
+- [x] Research Directions — AI-suggested future work based on paper analysis
+- [x] AutoResearch — multi-agent pipeline to implement papers as code
 - [ ] Weekly digest email
 - [ ] Export My List to Notion / Obsidian
 - [ ] Citation graph — see which papers cite each other

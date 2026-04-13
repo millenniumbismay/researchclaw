@@ -4,8 +4,8 @@
 
 ## Current State
 
-- **Branch:** `autoresearch_phase_b_2026-04-09` (pending merge to `main`)
-- **Last updated:** 2026-04-09
+- **Branch:** `main` (all features merged)
+- **Last updated:** 2026-04-10
 - **Stack:** FastAPI + Pydantic (backend), Vanilla JS + D3.js + Chart.js (frontend)
 - **Test suite:** None yet
 - **Deployment:** Local only (`localhost:7337`)
@@ -41,14 +41,30 @@
 | Batched Claude API calls | 5 paper pairs per call reduces cost ~5x vs per-pair |
 | arXiv HTML extraction + sanitization | Get original Related Work section; sanitize to prevent XSS |
 | `claude-haiku-4-5` for all automated calls | Cost-efficient for high-volume operations |
-| Anthropic SDK for planning, Claude Agent SDK for dev/review | Right tool for each: chat vs filesystem agent |
-| Prompt caching on system + history prefix | Reduces cost for multi-turn planning with large paper contexts |
+| claude-agent-sdk for all AutoResearch LLM calls | Uses Claude subscription (no extra API key/costs); session resumption for multi-turn chat |
+| `env={"ANTHROPIC_API_KEY": ""}` in SDK options | Prevents stale .env keys from overriding SDK's OAuth auth |
+| `python-dotenv` at app startup | Loads .env automatically without manual `source .env` |
 | Standalone git repos per AutoResearch project | Isolation between experiments; `uv` for fast venv |
 | SSE for agent activity streaming | Simpler than WebSocket for unidirectional server→client events |
 
 ## Session Log
 
 <!-- Add new sessions at the top. Keep entries concise. -->
+
+### 2026-04-10 — Planner SDK Refactor
+
+**Branch:** `planner_sdk_refactor_2026-04-10` → merged to `main`
+
+**What was done:**
+- Refactored all AutoResearch LLM calls (planner + context extraction) from raw Anthropic SDK to `claude-agent-sdk` — uses Claude subscription, no extra API costs
+- PlannerAgent now uses async SDK query with `allowed_tools=[]` for pure chat, session resumption for multi-turn
+- Context service uses `_llm_query_sync()` helper with `asyncio.run()` bridge for background threads
+- Added `python-dotenv` loading at app startup (no manual `source .env` needed)
+- Fixed context builder arXiv fallback for URL-fetched papers
+- Fixed `ANTHROPIC_API_KEY` poisoning SDK auth via `env={"ANTHROPIC_API_KEY": ""}` override
+- E2E verified: context extraction (7 methods, 5 algorithms), planning chat with session resumption
+
+---
 
 ### 2026-04-09 — AutoResearch Phase A + B
 
